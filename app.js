@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
-
+const swaggerUi = require('swagger-ui-express'); 
+const { specs } = require('./config/swagger');  
 const routes = require('./src/routes');
 
 const app = express();
@@ -16,14 +17,14 @@ app.get('/health', (req, res) => {
 
 // API routes
 app.use('/api', routes);
+// swagger
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(specs)); 
 
 // 404
 app.use((req, res) => {
   res.status(404).json({ message: 'Not Found' });
 });
 
-// swagger
-app.use('/docs', swaggerUi.serve, swaggerUi.setup(specs));
 
 // Error handler
 app.use((err, req, res, next) => {
