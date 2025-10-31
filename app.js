@@ -22,6 +22,9 @@ app.use((req, res) => {
   res.status(404).json({ message: 'Not Found' });
 });
 
+// swagger
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(specs));
+
 // Error handler
 app.use((err, req, res, next) => {
   console.error('Error:', err);
