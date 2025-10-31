@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: crm-api
+    env: node
+    plan: free
+    buildCommand: "npm install"
+    startCommand: "npm start"
+    autoDeploy: true
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+      - key: DATABASE_URL
+        sync: false 
+
+      - key: RENDER_EXTERNAL_URL
+        fromService:
+          type: web
+          name: crm-api
+          property: host
