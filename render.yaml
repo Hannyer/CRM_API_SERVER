@@ -3,6 +3,7 @@ services:
     name: crm-api
     env: node
     plan: free
+    region: virginia
     buildCommand: "npm install"
     startCommand: "npm start"
     autoDeploy: true
@@ -10,12 +11,5 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-
       - key: DATABASE_URL
-        sync: false 
-
-      - key: RENDER_EXTERNAL_URL
-        fromService:
-          type: web
-          name: crm-api
-          property: host
+        sync: false   # La vas a agregar manual en Render UI
