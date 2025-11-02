@@ -20,6 +20,15 @@ app.use('/api', routes);
 // swagger
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(specs));
 
+app.use(cors({
+  origin: [
+    "https://core-link-three.vercel.app",
+    "http://localhost:5173"
+  ],
+  credentials: true,
+  methods: "GET,POST,PUT,DELETE,OPTIONS"
+}));
+
 app.get('/', (req, res) => {
   res.send('CRM API OK ✅');
 });
