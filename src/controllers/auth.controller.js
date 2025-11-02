@@ -3,6 +3,34 @@ const userService = require('../services/users.service');
 const configService = require('../services/config.service');
 const { decrypt,encrypt } = require('../utils/crypto-compat');
 
+/**
+ * @openapi
+ * /api/auth/login:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Iniciar sesión
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [username, password]
+ *             properties:
+ *               username:
+ *                 type: string
+ *                 example: usuario@correo.com
+ *               password:
+ *                 type: string
+ *                 example: 123456
+ *     responses:
+ *       200:
+ *         description: Sesión iniciada
+ *       401:
+ *         description: Credenciales incorrectas
+ *       500:
+ *         description: Error interno
+ */
 async function login(req, res) {
   try {
      const unauthorized = () =>
@@ -13,7 +41,6 @@ async function login(req, res) {
  
     if (!user) return unauthorized();
 
-    // Password en BD está cifrado como en C#
     let storedPlain;
     try {
       

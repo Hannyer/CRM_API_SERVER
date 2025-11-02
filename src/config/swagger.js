@@ -1,23 +1,25 @@
 const swaggerJsdoc = require('swagger-jsdoc');
+const path = require('path');
+const schemas = require('../docs/schemas');
 
-const PORT = process.env.PORT || 3000;
-const PUBLIC_URL =
-  process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+const definition = {
+  openapi: '3.0.0',
+  info: {
+    title: 'CRM API',
+    version: '1.0.0',
+    description: 'API para CRM con autenticación y configuración',
+  },
+  servers: [
+    { url: process.env.SWAGGER_SERVER_URL || 'http://localhost:3000' },
+  ],
+  ...schemas,
+};
 
 const options = {
-  definition: {
-    openapi: '3.0.1',
-    info: {
-      title: 'CRM API',
-      version: '1.0.0',
-      description: 'API para CRM con autenticación y configuración',
-    },
-    servers: [{ url: PUBLIC_URL }],
-  },
-
+  definition,
   apis: [
-    './src/routes/*.js',
-    './src/controllers/*.js',
+    path.join(__dirname, '../routes/**/*.js'),
+    path.join(__dirname, '../controllers/**/*.js'),
   ],
 };
 
