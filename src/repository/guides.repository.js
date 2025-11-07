@@ -8,13 +8,31 @@ async function getAvailability({ date, activityTypeId = null, languageIds = [] }
   return rows;
 }
 
-async function listGuides() {
+async function listGuides({ page = 1, limit = 10 } = {}) {
+  const offset = (page - 1) * limit;
+  
+  // Obtener el total de registros
+  const countResult = await pool.query(
+    `SELECT COUNT(*) as total FROM ops.guide`
+  );
+  const total = parseInt(countResult.rows[0].total, 10);
+  
+  // Obtener los registros paginados
   const { rows } = await pool.query(
     `SELECT id, name, email, phone, status, is_leader as isLeader, max_party_size as maxPartySize
      FROM ops.guide
-     ORDER BY name`
+     ORDER BY name
+     LIMIT $1 OFFSET $2`,
+    [limit, offset]
   );
-  return rows;
+  
+  return {
+    items: rows,
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit)
+  };
 }
 
 async function createGuide({ name, email, phone = null, isLeader = false, status = true, maxPartySize = null }) {

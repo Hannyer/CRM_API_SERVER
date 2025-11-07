@@ -80,10 +80,28 @@ async function availability(req, res) {
  *   get:
  *     tags: [Guides]
  *     summary: Listar todos los guías
- *     description: Obtiene una lista de todos los guías registrados en el sistema
+ *     description: Obtiene una lista paginada de todos los guías registrados en el sistema
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *         description: Número de página (por defecto 1)
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 10
+ *         description: Cantidad de registros por página (por defecto 10, máximo 100)
  *     responses:
  *       200:
- *         description: Lista de guías
+ *         description: Lista paginada de guías
  *         content:
  *           application/json:
  *             schema:
@@ -93,6 +111,27 @@ async function availability(req, res) {
  *                   type: array
  *                   items:
  *                     $ref: '#/components/schemas/GuideListItem'
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     page:
+ *                       type: integer
+ *                       description: Página actual
+ *                     limit:
+ *                       type: integer
+ *                       description: Cantidad de registros por página
+ *                     total:
+ *                       type: integer
+ *                       description: Total de registros
+ *                     totalPages:
+ *                       type: integer
+ *                       description: Total de páginas
+ *       400:
+ *         description: Parámetros de paginación inválidos
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: Error interno del servidor
  *         content:
@@ -102,8 +141,32 @@ async function availability(req, res) {
  */
 async function list(req, res) {
   try {
-    const data = await guidesService.listGuides();
-    res.json({ items: data });
+    // Parsear y validar parámetros de paginación
+    let page = parseInt(req.query.page, 10) || 1;
+    let limit = parseInt(req.query.limit, 10) || 10;
+    
+    // Validaciones
+    if (page < 1) {
+      return sendErrorResponse(res, { status: 400, message: 'page debe ser mayor o igual a 1' });
+    }
+    if (limit < 1) {
+      return sendErrorResponse(res, { status: 400, message: 'limit debe ser mayor o igual a 1' });
+    }
+    if (limit > 100) {
+      return sendErrorResponse(res, { status: 400, message: 'limit no puede ser mayor a 100' });
+    }
+    
+    const data = await guidesService.listGuides({ page, limit });
+    
+    res.json({
+      items: data.items,
+      pagination: {
+        page: data.page,
+        limit: data.limit,
+        total: data.total,
+        totalPages: data.totalPages
+      }
+    });
   } catch (e) {
     console.error(e);
     sendErrorResponse(res, e, 500, 'Error al listar guías');

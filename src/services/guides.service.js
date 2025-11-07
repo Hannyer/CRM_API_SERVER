@@ -5,8 +5,8 @@ async function getAvailability(params) {
 }
 
 
-async function listGuides() {
-  return guidesRepo.listGuides();
+async function listGuides({ page, limit } = {}) {
+  return guidesRepo.listGuides({ page, limit });
 }
 
 async function createGuide({ fullName, email, phone, isLeader, status, maxPartySize }) {

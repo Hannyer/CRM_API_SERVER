@@ -130,6 +130,119 @@ module.exports = {
         },
       },
 
+      Transport: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid', example: '123e4567-e89b-12d3-a456-426614174000' },
+          capacity: { type: 'integer', example: 20, description: 'Capacidad de pasajeros' },
+          model: { type: 'string', example: 'Toyota Hiace 2023' },
+          operationalStatus: { type: 'boolean', example: true, description: 'true = activo, false = fuera de circulación' },
+          status: { type: 'boolean', example: true, description: 'Estado general del registro' },
+        },
+      },
+
+      TransportListItem: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid', example: '123e4567-e89b-12d3-a456-426614174000' },
+          capacity: { type: 'integer', example: 20, description: 'Capacidad de pasajeros' },
+          model: { type: 'string', example: 'Toyota Hiace 2023' },
+          operationalStatus: { type: 'boolean', example: true, description: 'true = activo, false = fuera de circulación' },
+          status: { type: 'boolean', example: true, description: 'Estado general del registro' },
+        },
+      },
+
+      TransportCreateRequest: {
+        type: 'object',
+        required: ['capacity', 'model'],
+        properties: {
+          capacity: { type: 'integer', example: 20, description: 'Capacidad de pasajeros (debe ser mayor a 0)' },
+          model: { type: 'string', example: 'Toyota Hiace 2023' },
+          operationalStatus: { type: 'boolean', example: true, description: 'Estado operativo (por defecto true)' },
+          status: { type: 'boolean', example: true, description: 'Estado general (por defecto true)' },
+        },
+      },
+
+      TransportUpdateRequest: {
+        type: 'object',
+        properties: {
+          capacity: { type: 'integer', example: 25, description: 'Capacidad de pasajeros (debe ser mayor a 0)' },
+          model: { type: 'string', example: 'Toyota Hiace 2024' },
+          operationalStatus: { type: 'boolean', example: false, description: 'Estado operativo' },
+          status: { type: 'boolean', example: true, description: 'Estado general' },
+        },
+      },
+
+      Configuration: {
+        type: 'object',
+        properties: {
+          pkConfiguration: { type: 'integer', format: 'int64', example: 1, description: 'ID único de la configuración' },
+          estado: { type: 'integer', example: 1, description: 'Estado de la configuración (1 = activo, 0 = inactivo)' },
+          description: { type: 'string', nullable: true, example: 'Descripción de la configuración' },
+          observacion: { type: 'string', nullable: true, example: 'Observaciones adicionales' },
+          key01: { type: 'string', nullable: true, example: 'PARAMETRO', description: 'Clave 01 (máx 50 caracteres)' },
+          key02: { type: 'string', nullable: true, example: 'FUNCIONALIDAD', description: 'Clave 02 (máx 50 caracteres)' },
+          key03: { type: 'string', nullable: true, example: 'MRB', description: 'Clave 03 (máx 50 caracteres)' },
+          key04: { type: 'string', nullable: true, example: 'ROL', description: 'Clave 04 (máx 50 caracteres)' },
+          key05: { type: 'string', nullable: true, example: 'CLIENTE', description: 'Clave 05 (máx 50 caracteres)' },
+          key06: { type: 'string', nullable: true, example: 'ROLCLIENTE', description: 'Clave 06 (texto)' },
+          value: { type: 'string', nullable: true, example: 'Valor de la configuración', description: 'Valor de la configuración' },
+          displayName: { type: 'string', nullable: true, example: 'Nombre para mostrar', description: 'Nombre para mostrar (máx 50 caracteres)' },
+        },
+      },
+
+      ConfigurationListItem: {
+        type: 'object',
+        properties: {
+          pkConfiguration: { type: 'integer', format: 'int64', example: 1, description: 'ID único de la configuración' },
+          estado: { type: 'integer', example: 1, description: 'Estado de la configuración (1 = activo, 0 = inactivo)' },
+          description: { type: 'string', nullable: true, example: 'Descripción de la configuración' },
+          observacion: { type: 'string', nullable: true, example: 'Observaciones adicionales' },
+          key01: { type: 'string', nullable: true, example: 'PARAMETRO', description: 'Clave 01 (máx 50 caracteres)' },
+          key02: { type: 'string', nullable: true, example: 'FUNCIONALIDAD', description: 'Clave 02 (máx 50 caracteres)' },
+          key03: { type: 'string', nullable: true, example: 'MRB', description: 'Clave 03 (máx 50 caracteres)' },
+          key04: { type: 'string', nullable: true, example: 'ROL', description: 'Clave 04 (máx 50 caracteres)' },
+          key05: { type: 'string', nullable: true, example: 'CLIENTE', description: 'Clave 05 (máx 50 caracteres)' },
+          key06: { type: 'string', nullable: true, example: 'ROLCLIENTE', description: 'Clave 06 (texto)' },
+          value: { type: 'string', nullable: true, example: 'Valor de la configuración', description: 'Valor de la configuración' },
+          displayName: { type: 'string', nullable: true, example: 'Nombre para mostrar', description: 'Nombre para mostrar (máx 50 caracteres)' },
+        },
+      },
+
+      ConfigurationCreateRequest: {
+        type: 'object',
+        properties: {
+          estado: { type: 'integer', example: 1, description: 'Estado de la configuración (por defecto 1)' },
+          description: { type: 'string', nullable: true, example: 'Descripción de la configuración' },
+          observacion: { type: 'string', nullable: true, example: 'Observaciones adicionales' },
+          key01: { type: 'string', nullable: true, example: 'PARAMETRO', description: 'Clave 01 (máx 50 caracteres)' },
+          key02: { type: 'string', nullable: true, example: 'FUNCIONALIDAD', description: 'Clave 02 (máx 50 caracteres)' },
+          key03: { type: 'string', nullable: true, example: 'MRB', description: 'Clave 03 (máx 50 caracteres)' },
+          key04: { type: 'string', nullable: true, example: 'ROL', description: 'Clave 04 (máx 50 caracteres)' },
+          key05: { type: 'string', nullable: true, example: 'CLIENTE', description: 'Clave 05 (máx 50 caracteres)' },
+          key06: { type: 'string', nullable: true, example: 'ROLCLIENTE', description: 'Clave 06 (texto)' },
+          value: { type: 'string', nullable: true, example: 'Valor de la configuración', description: 'Valor de la configuración' },
+          displayName: { type: 'string', nullable: true, example: 'Nombre para mostrar', description: 'Nombre para mostrar (máx 50 caracteres)' },
+        },
+      },
+
+      ConfigurationUpdateRequest: {
+        type: 'object',
+        properties: {
+          estado: { type: 'integer', example: 1, description: 'Estado de la configuración' },
+          description: { type: 'string', nullable: true, example: 'Descripción de la configuración' },
+          observacion: { type: 'string', nullable: true, example: 'Observaciones adicionales' },
+          key01: { type: 'string', nullable: true, example: 'PARAMETRO', description: 'Clave 01 (máx 50 caracteres)' },
+          key02: { type: 'string', nullable: true, example: 'FUNCIONALIDAD', description: 'Clave 02 (máx 50 caracteres)' },
+          key03: { type: 'string', nullable: true, example: 'MRB', description: 'Clave 03 (máx 50 caracteres)' },
+          key04: { type: 'string', nullable: true, example: 'ROL', description: 'Clave 04 (máx 50 caracteres)' },
+          key05: { type: 'string', nullable: true, example: 'CLIENTE', description: 'Clave 05 (máx 50 caracteres)' },
+          key06: { type: 'string', nullable: true, example: 'ROLCLIENTE', description: 'Clave 06 (texto)' },
+          value: { type: 'string', nullable: true, example: 'Valor de la configuración', description: 'Valor de la configuración' },
+          displayName: { type: 'string', nullable: true, example: 'Nombre para mostrar', description: 'Nombre para mostrar (máx 50 caracteres)' },
+        },
+      },
+
       ErrorResponse: {
         type: 'object',
         required: ['status', 'title', 'message'],
