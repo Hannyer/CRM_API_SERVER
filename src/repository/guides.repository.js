@@ -27,23 +27,7 @@ async function createGuide({ name, email, phone = null, isLeader = false, status
   const { rows } = await pool.query(sql, params);
   return rows[0];
 }
-async function setGuideLanguages(guideId, languageIds = []) {
-  // Limpiamos y luego insertamos los nuevos
-  await pool.query(`DELETE FROM ops.guide_language WHERE guide_id = $1`, [guideId]);
-
-  if (languageIds.length) {
-    // Inserción masiva con UNNEST
-    await pool.query(
-      `
-      INSERT INTO ops.guide_language (guide_id, language_id)
-      SELECT $1::uuid, UNNEST($2::uuid[])
-      ON CONFLICT DO NOTHING
-      `,
-      [guideId, languageIds]
-    );
-  }
-
-  // Devolvemos el guía con sus idiomas actuales
+async function getGuideById(guideId) {
   const { rows } = await pool.query(
     `
     SELECT 
@@ -63,12 +47,102 @@ async function setGuideLanguages(guideId, languageIds = []) {
     [guideId]
   );
 
-  return rows[0];
+  return rows[0] || null;
+}
+
+async function updateGuide(guideId, { name, email, phone, isLeader, status, maxPartySize }) {
+  const updates = [];
+  const params = [];
+  let paramIndex = 1;
+
+  if (name !== undefined) {
+    updates.push(`name = $${paramIndex++}`);
+    params.push(name);
+  }
+  if (email !== undefined) {
+    updates.push(`email = $${paramIndex++}`);
+    params.push(email);
+  }
+  if (phone !== undefined) {
+    updates.push(`phone = $${paramIndex++}`);
+    params.push(phone);
+  }
+  if (isLeader !== undefined) {
+    updates.push(`is_leader = $${paramIndex++}`);
+    params.push(isLeader);
+  }
+  if (status !== undefined) {
+    updates.push(`status = $${paramIndex++}`);
+    params.push(status);
+  }
+  if (maxPartySize !== undefined) {
+    updates.push(`max_party_size = $${paramIndex++}`);
+    params.push(maxPartySize);
+  }
+
+  if (updates.length === 0) {
+    // Si no hay actualizaciones, devolvemos el guía actual
+    return getGuideById(guideId);
+  }
+
+  params.push(guideId);
+  const sql = `
+    UPDATE ops.guide
+    SET ${updates.join(', ')}
+    WHERE id = $${paramIndex}
+    RETURNING id, name, email, phone, status, is_leader, max_party_size;
+  `;
+
+  const { rows } = await pool.query(sql, params);
+  if (rows.length === 0) {
+    return null;
+  }
+
+  // Devolvemos el guía completo con idiomas
+  return getGuideById(guideId);
+}
+
+async function deleteGuide(guideId) {
+  // Soft delete: cambiamos el status a false
+  const { rows } = await pool.query(
+    `
+    UPDATE ops.guide
+    SET status = false
+    WHERE id = $1
+    RETURNING id, name, email, phone, status, is_leader, max_party_size;
+    `,
+    [guideId]
+  );
+
+  return rows[0] || null;
+}
+
+async function setGuideLanguages(guideId, languageIds = []) {
+  // Limpiamos y luego insertamos los nuevos
+  await pool.query(`DELETE FROM ops.guide_language WHERE guide_id = $1`, [guideId]);
+
+  if (languageIds.length) {
+    // Inserción masiva con UNNEST
+    await pool.query(
+      `
+      INSERT INTO ops.guide_language (guide_id, language_id)
+      SELECT $1::uuid, UNNEST($2::uuid[])
+      ON CONFLICT DO NOTHING
+      `,
+      [guideId, languageIds]
+    );
+  }
+
+  // Devolvemos el guía con sus idiomas actuales
+  return getGuideById(guideId);
 }
 
 module.exports = {
   getAvailability,
   listGuides,
   createGuide,
+  getGuideById,
+  updateGuide,
+  deleteGuide,
   setGuideLanguages,
 };
