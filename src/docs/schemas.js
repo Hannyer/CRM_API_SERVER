@@ -129,6 +129,28 @@ module.exports = {
           },
         },
       },
+
+      ErrorResponse: {
+        type: 'object',
+        required: ['status', 'title', 'message'],
+        properties: {
+          status: {
+            type: 'integer',
+            description: 'Código de estado HTTP',
+            example: 400,
+          },
+          title: {
+            type: 'string',
+            description: 'Título descriptivo del error',
+            example: 'Solicitud Inválida',
+          },
+          message: {
+            type: 'string',
+            description: 'Mensaje detallado del error',
+            example: 'fullName y email son requeridos',
+          },
+        },
+      },
     },
   },
 };

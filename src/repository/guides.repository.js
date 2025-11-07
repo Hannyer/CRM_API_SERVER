@@ -10,7 +10,7 @@ async function getAvailability({ date, activityTypeId = null, languageIds = [] }
 
 async function listGuides() {
   const { rows } = await pool.query(
-    `SELECT id, name, email, phone, status, is_leader, max_party_size
+    `SELECT id, name, email, phone, status, is_leader as isLeader, max_party_size as maxPartySize
      FROM ops.guide
      ORDER BY name`
   );
@@ -21,7 +21,7 @@ async function createGuide({ name, email, phone = null, isLeader = false, status
   const sql = `
     INSERT INTO ops.guide (name, email, phone, status, is_leader, max_party_size)
     VALUES ($1,   $2,    $3,    $4,     $5,        $6)
-    RETURNING id, name, email, phone, status, is_leader, max_party_size;
+    RETURNING id, name, email, phone, status, is_leader as "isLeader", max_party_size as "maxPartySize";
   `;
   const params = [name, email, phone, status, isLeader, maxPartySize];
   const { rows } = await pool.query(sql, params);
@@ -31,7 +31,7 @@ async function getGuideById(guideId) {
   const { rows } = await pool.query(
     `
     SELECT 
-      g.id, g.name, g.email, g.phone, g.status, g.is_leader, g.max_party_size,
+      g.id, g.name, g.email, g.phone, g.status, g.is_leader as "isLeader", g.max_party_size as "maxPartySize",
       COALESCE(
         (
           SELECT json_agg(json_build_object('id', l.id, 'code', l.code, 'name', l.name) ORDER BY l.name)
@@ -90,7 +90,7 @@ async function updateGuide(guideId, { name, email, phone, isLeader, status, maxP
     UPDATE ops.guide
     SET ${updates.join(', ')}
     WHERE id = $${paramIndex}
-    RETURNING id, name, email, phone, status, is_leader, max_party_size;
+    RETURNING id, name, email, phone, status, is_leader as "isLeader", max_party_size as "maxPartySize";
   `;
 
   const { rows } = await pool.query(sql, params);
@@ -109,7 +109,7 @@ async function deleteGuide(guideId) {
     UPDATE ops.guide
     SET status = false
     WHERE id = $1
-    RETURNING id, name, email, phone, status, is_leader, max_party_size;
+    RETURNING id, name, email, phone, status, is_leader as "isLeader", max_party_size as "maxPartySize";
     `,
     [guideId]
   );

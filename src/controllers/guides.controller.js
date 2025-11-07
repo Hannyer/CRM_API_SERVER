@@ -1,5 +1,6 @@
 const guidesService = require('../services/guides.service');
 const { AppError } = require('../utils/AppError');
+const { sendErrorResponse } = require('../utils/errorHandler');
 
 /**
  * @openapi
@@ -42,13 +43,23 @@ const { AppError } = require('../utils/AppError');
  *                 $ref: '#/components/schemas/GuideAvailabilityItem'
  *       400:
  *         description: Parámetro date es requerido
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: Error interno del servidor
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 async function availability(req, res) {
   try {
     const { date, activityTypeId, languageIds } = req.query;
-    if (!date) return res.status(400).json({ message: 'date es requerido (YYYY-MM-DD)' });
+    if (!date) {
+      return sendErrorResponse(res, { status: 400, message: 'date es requerido (YYYY-MM-DD)' });
+    }
 
     const langs = typeof languageIds === 'string' && languageIds.length
       ? languageIds.split(',').map(s => s.trim())
@@ -60,14 +71,7 @@ async function availability(req, res) {
     res.json(data);
   } catch (e) {
     console.error(e);
-     if (e instanceof AppError) {
-      return res.status(e.status).json({
-        message: e.message,
-        code: e.code,
-        details: e.details
-      });
-    }
-    res.status(500).json({ message: 'Error al consultar disponibilidad '+e.message });
+    sendErrorResponse(res, e, 500, 'Error al consultar disponibilidad');
   }
 }
 /**
@@ -91,6 +95,10 @@ async function availability(req, res) {
  *                     $ref: '#/components/schemas/GuideListItem'
  *       500:
  *         description: Error interno del servidor
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 async function list(req, res) {
   try {
@@ -98,7 +106,7 @@ async function list(req, res) {
     res.json({ items: data });
   } catch (e) {
     console.error(e);
-    res.status(500).json({ message: 'Error al listar guías' });
+    sendErrorResponse(res, e, 500, 'Error al listar guías');
   }
 }
 
@@ -126,8 +134,16 @@ async function list(req, res) {
  *               $ref: '#/components/schemas/Guide'
  *       404:
  *         description: Guía no encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: Error interno del servidor
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 async function getById(req, res) {
   try {
@@ -135,13 +151,13 @@ async function getById(req, res) {
     const guide = await guidesService.getGuideById(id);
     
     if (!guide) {
-      return res.status(404).json({ message: 'Guía no encontrado' });
+      return sendErrorResponse(res, { status: 404, message: 'Guía no encontrado' });
     }
     
     res.json(guide);
   } catch (e) {
     console.error(e);
-    res.status(500).json({ message: 'Error al obtener guía' });
+    sendErrorResponse(res, e, 500, 'Error al obtener guía');
   }
 }
 
@@ -167,15 +183,29 @@ async function getById(req, res) {
  *               $ref: '#/components/schemas/Guide'
  *       400:
  *         description: Datos inválidos (fullName y email son requeridos)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       409:
  *         description: Ya existe un guía con ese email
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: Error interno del servidor
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 async function create(req, res) {
   try {
     const { fullName, email, phone = null, isLeader = false, status = true, maxPartySize = null } = req.body || {};
-    if (!fullName || !email) return res.status(400).json({ message: 'fullName y email son requeridos' });
+    if (!fullName || !email) {
+      return sendErrorResponse(res, { status: 400, message: 'fullName y email son requeridos' });
+    }
 
     const guide = await guidesService.createGuide({ fullName, email, phone, isLeader, status, maxPartySize });
     res.status(201).json(guide);
@@ -183,9 +213,9 @@ async function create(req, res) {
     console.error(e);
     // conflicto por email único (si lo definiste)
     if (String(e.message).toLowerCase().includes('unique')) {
-      return res.status(409).json({ message: 'Ya existe un guía con ese email' });
+      return sendErrorResponse(res, { status: 409, message: 'Ya existe un guía con ese email' });
     }
-    res.status(500).json({ message: 'Error al crear guía' });
+    sendErrorResponse(res, e, 500, 'Error al crear guía');
   }
 }
 
@@ -219,10 +249,22 @@ async function create(req, res) {
  *               $ref: '#/components/schemas/Guide'
  *       404:
  *         description: Guía no encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       409:
  *         description: Ya existe un guía con ese email
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: Error interno del servidor
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 async function update(req, res) {
   try {
@@ -239,16 +281,16 @@ async function update(req, res) {
     });
     
     if (!guide) {
-      return res.status(404).json({ message: 'Guía no encontrado' });
+      return sendErrorResponse(res, { status: 404, message: 'Guía no encontrado' });
     }
     
     res.json(guide);
   } catch (e) {
     console.error(e);
     if (String(e.message).toLowerCase().includes('unique')) {
-      return res.status(409).json({ message: 'Ya existe un guía con ese email' });
+      return sendErrorResponse(res, { status: 409, message: 'Ya existe un guía con ese email' });
     }
-    res.status(500).json({ message: 'Error al actualizar guía' });
+    sendErrorResponse(res, e, 500, 'Error al actualizar guía');
   }
 }
 
@@ -282,8 +324,16 @@ async function update(req, res) {
  *                   $ref: '#/components/schemas/GuideListItem'
  *       404:
  *         description: Guía no encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: Error interno del servidor
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 async function remove(req, res) {
   try {
@@ -291,13 +341,13 @@ async function remove(req, res) {
     const guide = await guidesService.deleteGuide(id);
     
     if (!guide) {
-      return res.status(404).json({ message: 'Guía no encontrado' });
+      return sendErrorResponse(res, { status: 404, message: 'Guía no encontrado' });
     }
     
     res.json({ message: 'Guía eliminado correctamente', guide });
   } catch (e) {
     console.error(e);
-    res.status(500).json({ message: 'Error al eliminar guía' });
+    sendErrorResponse(res, e, 500, 'Error al eliminar guía');
   }
 }
 
@@ -331,21 +381,29 @@ async function remove(req, res) {
  *               $ref: '#/components/schemas/Guide'
  *       400:
  *         description: languageIds debe ser un arreglo de UUID
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: Error interno del servidor
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 async function setLanguages(req, res) {
   try {
     const { id } = req.params;
     const { languageIds } = req.body || {};
     if (!Array.isArray(languageIds)) {
-      return res.status(400).json({ message: 'languageIds debe ser un arreglo de UUID' });
+      return sendErrorResponse(res, { status: 400, message: 'languageIds debe ser un arreglo de UUID' });
     }
     const out = await guidesService.setGuideLanguages(id, languageIds);
     res.json(out);
   } catch (e) {
     console.error(e);
-    res.status(500).json({ message: 'Error al asignar idiomas al guía' });
+    sendErrorResponse(res, e, 500, 'Error al asignar idiomas al guía');
   }
 }
 
