@@ -243,6 +243,75 @@ module.exports = {
         },
       },
 
+      ActivityByDate: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid', example: '123e4567-e89b-12d3-a456-426614174000', description: 'ID de la actividad' },
+          title: { type: 'string', example: 'Tour Canopy - Grupo 1', description: 'Título de la actividad' },
+          partySize: { type: 'integer', example: 20, description: 'Tamaño del grupo' },
+          scheduledStart: { type: 'string', format: 'date-time', example: '2024-12-25T08:00:00Z', description: 'Fecha y hora de inicio programada' },
+          scheduledEnd: { type: 'string', format: 'date-time', example: '2024-12-25T10:00:00Z', description: 'Fecha y hora de fin programada' },
+          activityTypeId: { type: 'string', format: 'uuid', example: '123e4567-e89b-12d3-a456-426614174000', description: 'ID del tipo de actividad' },
+          activityTypeName: { type: 'string', example: 'Canopy', description: 'Nombre del tipo de actividad' },
+          activityTypeDescription: { type: 'string', nullable: true, example: 'Tour de canopy por las copas de los árboles', description: 'Descripción del tipo de actividad' },
+          guides: {
+            type: 'array',
+            description: 'Lista de guías asignados a la actividad',
+            items: {
+              type: 'object',
+              properties: {
+                id: { type: 'string', format: 'uuid', example: '123e4567-e89b-12d3-a456-426614174000' },
+                name: { type: 'string', example: 'Juan Pérez' },
+                email: { type: 'string', example: 'juan.perez@example.com' },
+                isLeader: { type: 'boolean', example: true, description: 'Indica si es guía líder' },
+              },
+            },
+          },
+          languages: {
+            type: 'array',
+            description: 'Idiomas disponibles para la actividad',
+            items: {
+              type: 'object',
+              properties: {
+                id: { type: 'string', format: 'uuid', example: '123e4567-e89b-12d3-a456-426614174000' },
+                code: { type: 'string', example: 'es' },
+                name: { type: 'string', example: 'Español' },
+              },
+            },
+          },
+        },
+      },
+
+      ActivityListItem: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid', example: '123e4567-e89b-12d3-a456-426614174000', description: 'ID de la actividad' },
+          title: { type: 'string', example: 'Tour Canopy - Grupo 1', description: 'Título de la actividad' },
+          partySize: { type: 'integer', example: 20, description: 'Tamaño del grupo' },
+          scheduledStart: { type: 'string', format: 'date-time', example: '2024-12-25T08:00:00Z', description: 'Fecha y hora de inicio programada' },
+          scheduledEnd: { type: 'string', format: 'date-time', example: '2024-12-25T10:00:00Z', description: 'Fecha y hora de fin programada' },
+          activityTypeId: { type: 'string', format: 'uuid', example: '123e4567-e89b-12d3-a456-426614174000', description: 'ID del tipo de actividad' },
+          activityTypeName: { type: 'string', example: 'Canopy', description: 'Nombre del tipo de actividad' },
+        },
+      },
+
+      ActivityUpdateRequest: {
+        type: 'object',
+        properties: {
+          activityTypeId: { type: 'string', format: 'uuid', example: '123e4567-e89b-12d3-a456-426614174000', description: 'ID del tipo de actividad' },
+          title: { type: 'string', example: 'Tour Canopy - Grupo 1', description: 'Título de la actividad' },
+          partySize: { type: 'integer', example: 20, description: 'Tamaño del grupo' },
+          start: { type: 'string', format: 'date-time', example: '2024-12-25T08:00:00Z', description: 'Fecha y hora de inicio programada' },
+          end: { type: 'string', format: 'date-time', example: '2024-12-25T10:00:00Z', description: 'Fecha y hora de fin programada' },
+          languageIds: {
+            type: 'array',
+            items: { type: 'string', format: 'uuid' },
+            example: ['123e4567-e89b-12d3-a456-426614174000', '223e4567-e89b-12d3-a456-426614174001'],
+            description: 'IDs de idiomas para la actividad',
+          },
+        },
+      },
+
       ErrorResponse: {
         type: 'object',
         required: ['status', 'title', 'message'],

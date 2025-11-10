@@ -103,6 +103,98 @@ async function list(req, res) {
 
 /**
  * @openapi
+ * /api/config/by-keys:
+ *   get:
+ *     tags: [Configuration]
+ *     summary: Listar configuraciones por llaves
+ *     description: Obtiene una lista paginada de configuraciones filtradas por una o más llaves (KEY01, KEY02, KEY03, KEY04, KEY05, KEY06)
+ *     parameters:
+ *       - in: query
+ *         name: key01
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Valor de KEY01 para filtrar
+ *       - in: query
+ *         name: key02
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Valor de KEY02 para filtrar
+ *       - in: query
+ *         name: key03
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Valor de KEY03 para filtrar
+ *       - in: query
+ *         name: key04
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Valor de KEY04 para filtrar
+ *       - in: query
+ *         name: key05
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Valor de KEY05 para filtrar
+ *       - in: query
+ *         name: key06
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Valor de KEY06 para filtrar
+ *     responses:
+ *       200:
+ *         description: Lista de configuraciones filtradas por llaves
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/ConfigurationListItem'
+ *       400:
+ *         description: Parámetros inválidos o no se proporcionó ninguna llave
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Error interno del servidor
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+async function listByKeys(req, res) {
+  try {
+    const { key01, key02, key03, key04, key05, key06 } = req.query;
+    
+    // Validar que al menos una llave sea proporcionada
+    const hasAnyKey = key01 || key02 || key03 || key04 || key05 || key06;
+    if (!hasAnyKey) {
+      return sendErrorResponse(res, { status: 400, message: 'Debe proporcionar al menos una llave (key01, key02, key03, key04, key05 o key06)' });
+    }
+    
+    const data = await configService.listConfigurationsByKeys({ 
+      key01, 
+      key02, 
+      key03, 
+      key04, 
+      key05, 
+      key06
+    });
+    
+    res.json(data);
+  } catch (e) {
+    console.error(e);
+    sendErrorResponse(res, e, 500, 'Error al listar configuraciones por llaves');
+  }
+}
+
+/**
+ * @openapi
  * /api/config/{id}:
  *   get:
  *     tags: [Configuration]
@@ -386,5 +478,5 @@ async function remove(req, res) {
   }
 }
 
-module.exports = { list, getById, create, update, remove };
+module.exports = { list, listByKeys, getById, create, update, remove };
 

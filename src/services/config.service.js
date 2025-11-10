@@ -24,6 +24,10 @@ async function listConfigurations({ page, limit } = {}) {
   return configRepo.listConfigurations({ page, limit });
 }
 
+async function listConfigurationsByKeys({ key01, key02, key03, key04, key05, key06 } = {}) {
+  return configRepo.listConfigurationsByKeys({ key01, key02, key03, key04, key05, key06 });
+}
+
 async function createConfiguration({ 
   estado, 
   description, 
@@ -93,6 +97,7 @@ async function deleteConfiguration(pkConfiguration) {
 module.exports = { 
   getRolClienteValue,
   listConfigurations,
+  listConfigurationsByKeys,
   createConfiguration,
   getConfigurationById,
   updateConfiguration,

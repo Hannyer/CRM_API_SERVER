@@ -296,9 +296,79 @@ async function deleteConfiguration(pkConfiguration) {
   return rows[0] || null;
 }
 
+async function listConfigurationsByKeys({ 
+  key01 = null, 
+  key02 = null, 
+  key03 = null, 
+  key04 = null, 
+  key05 = null, 
+  key06 = null
+} = {}) {
+  const conditions = [];
+  const params = [];
+  let paramIndex = 1;
+
+  // Construir condiciones dinámicamente basadas en las llaves proporcionadas
+  if (key01 !== null && key01 !== undefined && key01 !== '') {
+    conditions.push(`"KEY01" = $${paramIndex++}`);
+    params.push(key01);
+  }
+  if (key02 !== null && key02 !== undefined && key02 !== '') {
+    conditions.push(`"KEY02" = $${paramIndex++}`);
+    params.push(key02);
+  }
+  if (key03 !== null && key03 !== undefined && key03 !== '') {
+    conditions.push(`"KEY03" = $${paramIndex++}`);
+    params.push(key03);
+  }
+  if (key04 !== null && key04 !== undefined && key04 !== '') {
+    conditions.push(`"KEY04" = $${paramIndex++}`);
+    params.push(key04);
+  }
+  if (key05 !== null && key05 !== undefined && key05 !== '') {
+    conditions.push(`"KEY05" = $${paramIndex++}`);
+    params.push(key05);
+  }
+  if (key06 !== null && key06 !== undefined && key06 !== '') {
+    conditions.push(`"KEY06" = $${paramIndex++}`);
+    params.push(key06);
+  }
+
+  // Si no hay condiciones, devolver lista vacía
+  if (conditions.length === 0) {
+    return [];
+  }
+
+  const whereClause = conditions.join(' AND ');
+  
+  // Obtener todos los registros sin paginación
+  const { rows } = await pool.query(
+    `SELECT 
+      "PK_CONFIGURATION" as "pkConfiguration",
+      "ESTADO" as "estado",
+      "DESCRIPTION" as "description",
+      "OBSERVACION" as "observacion",
+      "KEY01" as "key01",
+      "KEY02" as "key02",
+      "KEY03" as "key03",
+      "KEY04" as "key04",
+      "KEY05" as "key05",
+      "KEY06" as "key06",
+      "VALUE" as "value",
+      "DisplayName" as "displayName"
+     FROM dbo."CONFIGURATION"
+     WHERE ${whereClause}
+     ORDER BY "PK_CONFIGURATION" DESC`,
+    params
+  );
+  
+  return rows;
+}
+
 module.exports = { 
   getConfigList,
   listConfigurations,
+  listConfigurationsByKeys,
   createConfiguration,
   getConfigurationById,
   updateConfiguration,

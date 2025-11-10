@@ -105,7 +105,63 @@ async function replaceAssignments(activityId, assignments = []) {
   await activitiesRepo.replaceAssignments(activityId, assignments);
 }
 
+async function getActivitiesByDate(date) {
+  return activitiesRepo.getActivitiesByDate(date);
+}
+
+async function listActivities({ page, limit } = {}) {
+  return activitiesRepo.listActivities({ page, limit });
+}
+
+async function getActivityById(activityId) {
+  return activitiesRepo.getActivityById(activityId);
+}
+
+async function updateActivity(activityId, { activityTypeId, title, partySize, start, end, languageIds }) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Actualizar actividad
+    const activity = await activitiesRepo.updateActivity(activityId, {
+      activityTypeId,
+      title,
+      partySize,
+      start,
+      end
+    });
+
+    if (!activity) {
+      return null;
+    }
+
+    // Actualizar idiomas si se proporcionan
+    if (languageIds !== undefined) {
+      await activitiesRepo.setActivityLanguages(activityId, languageIds);
+    }
+
+    await client.query('COMMIT');
+    
+    // Devolver la actividad completa
+    return activitiesRepo.getActivityById(activityId);
+  } catch (e) {
+    await client.query('ROLLBACK');
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+async function deleteActivity(activityId) {
+  return activitiesRepo.deleteActivity(activityId);
+}
+
 module.exports = {
   createActivityAndAssign,
   replaceAssignments,
+  getActivitiesByDate,
+  listActivities,
+  getActivityById,
+  updateActivity,
+  deleteActivity,
 };

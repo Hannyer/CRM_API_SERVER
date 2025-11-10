@@ -3,6 +3,7 @@ const ctrl = require('../controllers/config.controller');
 
 const router = Router();
 
+router.get('/by-keys', ctrl.listByKeys);
 router.get('/', ctrl.list);
 router.get('/:id', ctrl.getById);
 router.post('/', ctrl.create);
