@@ -2,16 +2,16 @@
 const { pool } = require('../config/db.pg');
 
 /**
- * Crea la actividad dejando que Postgres genere el id (DEFAULT gen_random_uuid()).
+ * Crea una actividad sin fechas (las fechas se agregan como planeaciones)
  * Retorna el registro creado.
  */
-async function createActivity({ activityTypeId, title, partySize, start, end }) {
+async function createActivity({ activityTypeId, title, partySize, status = true }) {
   const sql = `
-    INSERT INTO ops.activity (activity_type_id, title, party_size, scheduled_start, scheduled_end)
-    VALUES ($1::uuid, $2, $3::int, $4::timestamptz, $5::timestamptz)
-    RETURNING id, activity_type_id, title, party_size, scheduled_start, scheduled_end;
+    INSERT INTO ops.activity (activity_type_id, title, party_size, status)
+    VALUES ($1::uuid, $2, $3::int, $4::bool)
+    RETURNING id, activity_type_id as "activityTypeId", title, party_size as "partySize", status;
   `;
-  const params = [activityTypeId, title, partySize, start, end];
+  const params = [activityTypeId, title, partySize, status];
   const { rows } = await pool.query(sql, params);
   return rows[0];
 }
@@ -41,14 +41,12 @@ async function setActivityLanguages(activityId, languageIds = []) {
 /**
  * Inserta (append) asignaciones para una actividad.
  * Valida que no vengan >1 líderes en el payload.
- * (La BD debe tener un UNIQUE parcial para reforzar 1 líder por actividad).
  */
 async function insertAssignments(activityId, assignments = []) {
   if (!assignments.length) return;
 
   const leaders = assignments.filter(a => a.isLeader);
   if (leaders.length > 1) {
-    // coherente con el controller para devolver 409
     throw new Error('uq_one_leader_per_activity');
   }
 
@@ -66,7 +64,6 @@ async function insertAssignments(activityId, assignments = []) {
 
 /**
  * Reemplaza completamente las asignaciones de una actividad.
- * Borra todo y vuelve a insertar lo recibido (si trae).
  */
 async function replaceAssignments(activityId, assignments = []) {
   const leaders = assignments.filter(a => a.isLeader);
@@ -86,7 +83,6 @@ async function replaceAssignments(activityId, assignments = []) {
 
 /**
  * Disponibilidad de guías por fecha/tipo/idiomas vía función SQL.
- * Si no hay idiomas, se envía NULL para permitir filtro opcional.
  */
 async function getGuidesAvailabilityByDate({ date, activityTypeId = null, languageIds = [] }) {
   const { rows } = await pool.query(
@@ -98,7 +94,7 @@ async function getGuidesAvailabilityByDate({ date, activityTypeId = null, langua
 
 /**
  * Obtiene todas las actividades programadas para una fecha específica
- * con información completa: tipo de actividad, horarios, guías asignados, idiomas, etc.
+ * usando las planeaciones (activity_schedule)
  */
 async function getActivitiesByDate(date) {
   const { rows } = await pool.query(
@@ -107,8 +103,11 @@ async function getActivitiesByDate(date) {
       a.id,
       a.title,
       a.party_size as "partySize",
-      a.scheduled_start as "scheduledStart",
-      a.scheduled_end as "scheduledEnd",
+      a.status,
+      s.id as "scheduleId",
+      s.scheduled_start as "scheduledStart",
+      s.scheduled_end as "scheduledEnd",
+      s.status as "scheduleStatus",
       at.id as "activityTypeId",
       at.name as "activityTypeName",
       at.description as "activityTypeDescription",
@@ -143,10 +142,13 @@ async function getActivitiesByDate(date) {
         ),
         '[]'::json
       ) AS languages
-    FROM ops.activity a
+    FROM ops.activity_schedule s
+    JOIN ops.activity a ON a.id = s.activity_id
     JOIN ops.activity_type at ON at.id = a.activity_type_id
-    WHERE DATE(a.scheduled_start) = $1::date
-    ORDER BY a.scheduled_start ASC
+    WHERE DATE(s.scheduled_start) = $1::date
+      AND s.status = true
+      AND a.status = true
+    ORDER BY s.scheduled_start ASC
     `,
     [date]
   );
@@ -154,14 +156,24 @@ async function getActivitiesByDate(date) {
 }
 
 /**
- * Lista todas las actividades con paginación
+ * Lista todas las actividades con paginación (sin incluir planeaciones)
  */
-async function listActivities({ page = 1, limit = 10 } = {}) {
+async function listActivities({ page = 1, limit = 10, status = null } = {}) {
   const offset = (page - 1) * limit;
   
+  let statusFilter = '';
+  const params = [];
+  let paramIndex = 1;
+
+  if (status !== null) {
+    statusFilter = `WHERE a.status = $${paramIndex++}::bool`;
+    params.push(status);
+  }
+
   // Obtener el total de registros
   const countResult = await pool.query(
-    `SELECT COUNT(*) as total FROM ops.activity`
+    `SELECT COUNT(*) as total FROM ops.activity a ${statusFilter}`,
+    params
   );
   const total = parseInt(countResult.rows[0].total, 10);
   
@@ -172,16 +184,21 @@ async function listActivities({ page = 1, limit = 10 } = {}) {
       a.id,
       a.title,
       a.party_size as "partySize",
-      a.scheduled_start as "scheduledStart",
-      a.scheduled_end as "scheduledEnd",
+      a.status,
       at.id as "activityTypeId",
-      at.name as "activityTypeName"
+      at.name as "activityTypeName",
+      (
+        SELECT COUNT(*) 
+        FROM ops.activity_schedule s 
+        WHERE s.activity_id = a.id AND s.status = true
+      ) as "schedulesCount"
     FROM ops.activity a
     JOIN ops.activity_type at ON at.id = a.activity_type_id
-    ORDER BY a.scheduled_start DESC
-    LIMIT $1 OFFSET $2
+    ${statusFilter}
+    ORDER BY a.title ASC
+    LIMIT $${paramIndex++} OFFSET $${paramIndex}
     `,
-    [limit, offset]
+    [...params, limit, offset]
   );
   
   return {
@@ -194,7 +211,7 @@ async function listActivities({ page = 1, limit = 10 } = {}) {
 }
 
 /**
- * Obtiene una actividad por ID con información completa
+ * Obtiene una actividad por ID con información completa incluyendo planeaciones
  */
 async function getActivityById(activityId) {
   const { rows } = await pool.query(
@@ -203,11 +220,25 @@ async function getActivityById(activityId) {
       a.id,
       a.title,
       a.party_size as "partySize",
-      a.scheduled_start as "scheduledStart",
-      a.scheduled_end as "scheduledEnd",
+      a.status,
       at.id as "activityTypeId",
       at.name as "activityTypeName",
       at.description as "activityTypeDescription",
+      COALESCE(
+        (
+          SELECT json_agg(
+            json_build_object(
+              'id', s.id,
+              'scheduledStart', s.scheduled_start,
+              'scheduledEnd', s.scheduled_end,
+              'status', s.status
+            ) ORDER BY s.scheduled_start ASC
+          )
+          FROM ops.activity_schedule s
+          WHERE s.activity_id = a.id
+        ),
+        '[]'::json
+      ) AS schedules,
       COALESCE(
         (
           SELECT json_agg(
@@ -250,9 +281,9 @@ async function getActivityById(activityId) {
 }
 
 /**
- * Actualiza una actividad existente
+ * Actualiza una actividad existente (sin fechas, solo datos básicos)
  */
-async function updateActivity(activityId, { activityTypeId, title, partySize, start, end }) {
+async function updateActivity(activityId, { activityTypeId, title, partySize, status }) {
   const updates = [];
   const params = [];
   let paramIndex = 1;
@@ -269,17 +300,12 @@ async function updateActivity(activityId, { activityTypeId, title, partySize, st
     updates.push(`party_size = $${paramIndex++}::int`);
     params.push(partySize);
   }
-  if (start !== undefined) {
-    updates.push(`scheduled_start = $${paramIndex++}::timestamptz`);
-    params.push(start);
-  }
-  if (end !== undefined) {
-    updates.push(`scheduled_end = $${paramIndex++}::timestamptz`);
-    params.push(end);
+  if (status !== undefined) {
+    updates.push(`status = $${paramIndex++}::bool`);
+    params.push(status);
   }
 
   if (updates.length === 0) {
-    // Si no hay actualizaciones, devolvemos la actividad actual
     return getActivityById(activityId);
   }
 
@@ -288,7 +314,7 @@ async function updateActivity(activityId, { activityTypeId, title, partySize, st
     UPDATE ops.activity
     SET ${updates.join(', ')}
     WHERE id = $${paramIndex}::uuid
-    RETURNING id, activity_type_id, title, party_size, scheduled_start, scheduled_end;
+    RETURNING id, activity_type_id as "activityTypeId", title, party_size as "partySize", status;
   `;
 
   const { rows } = await pool.query(sql, params);
@@ -300,24 +326,189 @@ async function updateActivity(activityId, { activityTypeId, title, partySize, st
 }
 
 /**
- * Elimina una actividad (soft delete si hay campo status, o hard delete)
- * Por ahora haremos hard delete, pero se puede cambiar fácilmente
+ * Activa o inactiva una actividad
+ */
+async function toggleActivityStatus(activityId, status) {
+  const { rows } = await pool.query(
+    `
+    UPDATE ops.activity
+    SET status = $1::bool
+    WHERE id = $2::uuid
+    RETURNING id, activity_type_id as "activityTypeId", title, party_size as "partySize", status;
+    `,
+    [status, activityId]
+  );
+
+  if (rows.length === 0) {
+    return null;
+  }
+
+  return rows[0];
+}
+
+/**
+ * Elimina una actividad (soft delete cambiando status a false)
  */
 async function deleteActivity(activityId) {
-  // Primero eliminamos las relaciones
-  await pool.query(`DELETE FROM ops.activity_assignment WHERE activity_id = $1::uuid`, [activityId]);
-  await pool.query(`DELETE FROM ops.activity_language WHERE activity_id = $1::uuid`, [activityId]);
-  
-  // Luego eliminamos la actividad
+  // Soft delete: cambiamos el status a false
   const { rows } = await pool.query(
-    `DELETE FROM ops.activity WHERE id = $1::uuid RETURNING id, title`,
+    `
+    UPDATE ops.activity
+    SET status = false
+    WHERE id = $1::uuid
+    RETURNING id, title, status;
+    `,
     [activityId]
   );
 
   return rows[0] || null;
 }
 
+// ========== FUNCIONES PARA PLANEACIONES (SCHEDULES) ==========
+
+/**
+ * Crea una nueva planeación para una actividad
+ */
+async function createSchedule(activityId, { scheduledStart, scheduledEnd, status = true }) {
+  const sql = `
+    INSERT INTO ops.activity_schedule (activity_id, scheduled_start, scheduled_end, status)
+    VALUES ($1::uuid, $2::timestamptz, $3::timestamptz, $4::bool)
+    RETURNING id, activity_id as "activityId", scheduled_start as "scheduledStart", 
+               scheduled_end as "scheduledEnd", status;
+  `;
+  const params = [activityId, scheduledStart, scheduledEnd, status];
+  const { rows } = await pool.query(sql, params);
+  return rows[0];
+}
+
+/**
+ * Obtiene una planeación por ID
+ */
+async function getScheduleById(scheduleId) {
+  const { rows } = await pool.query(
+    `
+    SELECT 
+      s.id,
+      s.activity_id as "activityId",
+      s.scheduled_start as "scheduledStart",
+      s.scheduled_end as "scheduledEnd",
+      s.status,
+      a.title as "activityTitle"
+    FROM ops.activity_schedule s
+    JOIN ops.activity a ON a.id = s.activity_id
+    WHERE s.id = $1::uuid
+    `,
+    [scheduleId]
+  );
+
+  return rows[0] || null;
+}
+
+/**
+ * Obtiene todas las planeaciones de una actividad
+ */
+async function getSchedulesByActivityId(activityId) {
+  const { rows } = await pool.query(
+    `
+    SELECT 
+      id,
+      activity_id as "activityId",
+      scheduled_start as "scheduledStart",
+      scheduled_end as "scheduledEnd",
+      status
+    FROM ops.activity_schedule
+    WHERE activity_id = $1::uuid
+    ORDER BY scheduled_start ASC
+    `,
+    [activityId]
+  );
+
+  return rows;
+}
+
+/**
+ * Actualiza una planeación
+ */
+async function updateSchedule(scheduleId, { scheduledStart, scheduledEnd, status }) {
+  const updates = [];
+  const params = [];
+  let paramIndex = 1;
+
+  if (scheduledStart !== undefined) {
+    updates.push(`scheduled_start = $${paramIndex++}::timestamptz`);
+    params.push(scheduledStart);
+  }
+  if (scheduledEnd !== undefined) {
+    updates.push(`scheduled_end = $${paramIndex++}::timestamptz`);
+    params.push(scheduledEnd);
+  }
+  if (status !== undefined) {
+    updates.push(`status = $${paramIndex++}::bool`);
+    params.push(status);
+  }
+
+  if (updates.length === 0) {
+    return getScheduleById(scheduleId);
+  }
+
+  params.push(scheduleId);
+  const sql = `
+    UPDATE ops.activity_schedule
+    SET ${updates.join(', ')}
+    WHERE id = $${paramIndex}::uuid
+    RETURNING id, activity_id as "activityId", scheduled_start as "scheduledStart", 
+               scheduled_end as "scheduledEnd", status;
+  `;
+
+  const { rows } = await pool.query(sql, params);
+  if (rows.length === 0) {
+    return null;
+  }
+
+  return rows[0];
+}
+
+/**
+ * Elimina una planeación (soft delete)
+ */
+async function deleteSchedule(scheduleId) {
+  const { rows } = await pool.query(
+    `
+    UPDATE ops.activity_schedule
+    SET status = false
+    WHERE id = $1::uuid
+    RETURNING id, activity_id as "activityId";
+    `,
+    [scheduleId]
+  );
+
+  return rows[0] || null;
+}
+
+/**
+ * Activa o inactiva una planeación
+ */
+async function toggleScheduleStatus(scheduleId, status) {
+  const { rows } = await pool.query(
+    `
+    UPDATE ops.activity_schedule
+    SET status = $1::bool
+    WHERE id = $2::uuid
+    RETURNING id, activity_id as "activityId", scheduled_start as "scheduledStart", 
+               scheduled_end as "scheduledEnd", status;
+    `,
+    [status, scheduleId]
+  );
+
+  if (rows.length === 0) {
+    return null;
+  }
+
+  return rows[0];
+}
+
 module.exports = {
+  // Actividades
   createActivity,
   setActivityLanguages,
   insertAssignments,
@@ -327,5 +518,13 @@ module.exports = {
   listActivities,
   getActivityById,
   updateActivity,
+  toggleActivityStatus,
   deleteActivity,
+  // Planeaciones
+  createSchedule,
+  getScheduleById,
+  getSchedulesByActivityId,
+  updateSchedule,
+  deleteSchedule,
+  toggleScheduleStatus,
 };

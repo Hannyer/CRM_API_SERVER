@@ -21,24 +21,10 @@ const { sendErrorResponse } = require('../utils/errorHandler');
  *     responses:
  *       200:
  *         description: Lista de actividades para la fecha especificada
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/ActivityByDate'
  *       400:
  *         description: Parámetro date es requerido o formato inválido
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: Error interno del servidor
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
  */
 async function getByDate(req, res) {
   try {
@@ -62,13 +48,42 @@ async function getByDate(req, res) {
   }
 }
 
+/**
+ * @openapi
+ * /api/activities:
+ *   get:
+ *     tags: [Activities]
+ *     summary: Listar todas las actividades
+ *     description: Obtiene una lista paginada de todas las actividades registradas en el sistema
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 10
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: boolean
+ *         description: Filtrar por estado (true = activas, false = inactivas, null = todas)
+ *     responses:
+ *       200:
+ *         description: Lista paginada de actividades
+ */
 async function list(req, res) {
   try {
-    // Parsear y validar parámetros de paginación
     let page = parseInt(req.query.page, 10) || 1;
     let limit = parseInt(req.query.limit, 10) || 10;
+    let status = req.query.status !== undefined ? req.query.status === 'true' : null;
     
-    // Validaciones
     if (page < 1) {
       return sendErrorResponse(res, { status: 400, message: 'page debe ser mayor o igual a 1' });
     }
@@ -79,7 +94,7 @@ async function list(req, res) {
       return sendErrorResponse(res, { status: 400, message: 'limit no puede ser mayor a 100' });
     }
     
-    const data = await activitiesService.listActivities({ page, limit });
+    const data = await activitiesService.listActivities({ page, limit, status });
     
     res.json({
       items: data.items,
@@ -99,178 +114,64 @@ async function list(req, res) {
 /**
  * @openapi
  * /api/activities:
- *   get:
- *     tags: [Activities]
- *     summary: Listar todas las actividades
- *     description: Obtiene una lista paginada de todas las actividades registradas en el sistema
- *     parameters:
- *       - in: query
- *         name: page
- *         required: false
- *         schema:
- *           type: integer
- *           minimum: 1
- *           default: 1
- *         description: Número de página (por defecto 1)
- *       - in: query
- *         name: limit
- *         required: false
- *         schema:
- *           type: integer
- *           minimum: 1
- *           maximum: 100
- *           default: 10
- *         description: Cantidad de registros por página (por defecto 10, máximo 100)
- *     responses:
- *       200:
- *         description: Lista paginada de actividades
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 items:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/ActivityListItem'
- *                 pagination:
- *                   type: object
- *                   properties:
- *                     page:
- *                       type: integer
- *                       description: Página actual
- *                     limit:
- *                       type: integer
- *                       description: Cantidad de registros por página
- *                     total:
- *                       type: integer
- *                       description: Total de registros
- *                     totalPages:
- *                       type: integer
- *                       description: Total de páginas
- *       400:
- *         description: Parámetros de paginación inválidos
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       500:
- *         description: Error interno del servidor
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
  *   post:
  *     tags: [Activities]
- *     summary: Crear actividad (y asignar guías si autoAssign = true)
- *     security:
- *       - bearerAuth: []
+ *     summary: Crear actividad
+ *     description: Crea una nueva actividad. Las fechas se pueden agregar como planeaciones después.
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/ActivityCreateRequest'
+ *             type: object
+ *             required:
+ *               - activityTypeId
+ *               - title
+ *               - partySize
+ *             properties:
+ *               activityTypeId:
+ *                 type: string
+ *                 format: uuid
+ *               title:
+ *                 type: string
+ *               partySize:
+ *                 type: integer
+ *               status:
+ *                 type: boolean
+ *                 default: true
+ *               languageIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: uuid
  *     responses:
  *       201:
  *         description: Actividad creada
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ActivityCreateResponse'
  *       400:
  *         description: Datos requeridos inválidos o faltantes
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       409:
- *         description: Conflicto de asignación (solape o más de un líder)
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       500:
- *         description: Error interno al crear actividad
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
  */
-
 async function create(req, res) {
   try {
     const payload = req.body || {};
-    if (!payload.activityTypeId || !payload.title || !payload.partySize || !payload.start || !payload.end) {
-      return res.status(400).json({ message: 'activityTypeId, title, partySize, start, end son requeridos' });
+    if (!payload.activityTypeId || !payload.title || payload.partySize === undefined) {
+      return res.status(400).json({ message: 'activityTypeId, title, partySize son requeridos' });
     }
 
-    const result = await activitiesService.createActivityAndAssign(payload);
+    const result = await activitiesService.createActivity(payload);
     res.status(201).json(result);
   } catch (e) {
     console.error(e);
-    // si la BD rechaza por solape/índice único de líder
-    if (String(e.message).toLowerCase().includes('exclude') || String(e.message).toLowerCase().includes('uq_one_leader_per_activity')) {
-      return res.status(409).json({ message: 'Conflicto de asignación (solape o más de un líder)' });
-    }
-     if (e instanceof AppError) {
+    if (e instanceof AppError) {
       return res.status(e.status).json({
         message: e.message,
         code: e.code,
         details: e.details
       });
     }
-    
-    res.status(500).json({ message: 'Error al crear actividad '+e.message });
+    res.status(500).json({ message: 'Error al crear actividad: ' + e.message });
   }
 }
 
-/**
- * @openapi
- * /api/activities/{id}/assignments:
- *   put:
- *     tags: [Activities]
- *     summary: Reemplazar completamente las asignaciones de guías de una actividad
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         schema:
- *           type: string
- *           format: uuid
- *         required: true
- *         description: ID de la actividad
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/AssignmentReplaceRequest'
- *     responses:
- *       200:
- *         description: Asignaciones actualizadas
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 ok:
- *                   type: boolean
- *                   example: true
- *       409:
- *         description: Conflicto de asignación (solape o más de un líder)
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       500:
- *         description: Error al actualizar asignaciones
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- */
 async function replaceAssignments(req, res) {
   try {
     const { id } = req.params;
@@ -282,7 +183,7 @@ async function replaceAssignments(req, res) {
     if (String(e.message).toLowerCase().includes('exclude') || String(e.message).toLowerCase().includes('uq_one_leader_per_activity')) {
       return res.status(409).json({ message: 'Conflicto de asignación (solape o más de un líder)' });
     }
-     if (e instanceof AppError) {
+    if (e instanceof AppError) {
       return res.status(e.status).json({
         message: e.message,
         code: e.code,
@@ -299,34 +200,7 @@ async function replaceAssignments(req, res) {
  *   get:
  *     tags: [Activities]
  *     summary: Obtener una actividad por ID
- *     description: Obtiene la información completa de una actividad incluyendo guías asignados e idiomas
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *         description: ID de la actividad
- *     responses:
- *       200:
- *         description: Información de la actividad
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ActivityByDate'
- *       404:
- *         description: Actividad no encontrada
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       500:
- *         description: Error interno del servidor
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *     description: Obtiene la información completa de una actividad incluyendo guías asignados, idiomas y planeaciones
  */
 async function getById(req, res) {
   try {
@@ -351,57 +225,17 @@ async function getById(req, res) {
  *     tags: [Activities]
  *     summary: Actualizar una actividad
  *     description: Actualiza la información de una actividad existente. Solo se actualizan los campos proporcionados.
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *         description: ID de la actividad
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/ActivityUpdateRequest'
- *     responses:
- *       200:
- *         description: Actividad actualizada exitosamente
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ActivityByDate'
- *       400:
- *         description: Datos inválidos
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       404:
- *         description: Actividad no encontrada
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       500:
- *         description: Error interno del servidor
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
  */
 async function update(req, res) {
   try {
     const { id } = req.params;
-    const { activityTypeId, title, partySize, start, end, languageIds } = req.body || {};
+    const { activityTypeId, title, partySize, status, languageIds } = req.body || {};
     
     const activity = await activitiesService.updateActivity(id, {
       activityTypeId,
       title,
       partySize,
-      start,
-      end,
+      status,
       languageIds
     });
     
@@ -418,50 +252,57 @@ async function update(req, res) {
 
 /**
  * @openapi
+ * /api/activities/{id}/toggle-status:
+ *   put:
+ *     tags: [Activities]
+ *     summary: Activar o inactivar una actividad
+ *     description: Cambia el estado de una actividad (activa/inactiva)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - status
+ *             properties:
+ *               status:
+ *                 type: boolean
+ *     responses:
+ *       200:
+ *         description: Estado actualizado
+ *       404:
+ *         description: Actividad no encontrada
+ */
+async function toggleStatus(req, res) {
+  try {
+    const { id } = req.params;
+    const { status } = req.body || {};
+    
+    if (typeof status !== 'boolean') {
+      return sendErrorResponse(res, { status: 400, message: 'status debe ser un booleano (true/false)' });
+    }
+    
+    const activity = await activitiesService.toggleActivityStatus(id, status);
+    
+    if (!activity) {
+      return sendErrorResponse(res, { status: 404, message: 'Actividad no encontrada' });
+    }
+    
+    res.json(activity);
+  } catch (e) {
+    console.error(e);
+    sendErrorResponse(res, e, 500, 'Error al cambiar estado de actividad');
+  }
+}
+
+/**
+ * @openapi
  * /api/activities/{id}:
  *   delete:
  *     tags: [Activities]
- *     summary: Eliminar una actividad
- *     description: Elimina una actividad y todas sus relaciones (asignaciones de guías e idiomas)
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *         description: ID de la actividad
- *     responses:
- *       200:
- *         description: Actividad eliminada correctamente
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Actividad eliminada correctamente
- *                 activity:
- *                   type: object
- *                   properties:
- *                     id:
- *                       type: string
- *                       format: uuid
- *                     title:
- *                       type: string
- *       404:
- *         description: Actividad no encontrada
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       500:
- *         description: Error interno del servidor
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
+ *     summary: Eliminar una actividad (soft delete)
+ *     description: Inactiva una actividad cambiando su status a false
  */
 async function remove(req, res) {
   try {
@@ -479,4 +320,239 @@ async function remove(req, res) {
   }
 }
 
-module.exports = { getByDate, list, getById, create, update, remove, replaceAssignments };
+// ========== CONTROLADORES PARA PLANEACIONES ==========
+
+/**
+ * @openapi
+ * /api/activities/{activityId}/schedules:
+ *   get:
+ *     tags: [Activities]
+ *     summary: Obtener todas las planeaciones de una actividad
+ *     description: Retorna todas las planeaciones (fechas/horas) asociadas a una actividad
+ */
+async function getSchedules(req, res) {
+  try {
+    const { activityId } = req.params;
+    const schedules = await activitiesService.getSchedulesByActivityId(activityId);
+    res.json(schedules);
+  } catch (e) {
+    console.error(e);
+    sendErrorResponse(res, e, 500, 'Error al obtener planeaciones');
+  }
+}
+
+/**
+ * @openapi
+ * /api/activities/{activityId}/schedules:
+ *   post:
+ *     tags: [Activities]
+ *     summary: Crear una nueva planeación para una actividad
+ *     description: Agrega una nueva fecha/hora programada para una actividad existente
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - scheduledStart
+ *               - scheduledEnd
+ *             properties:
+ *               scheduledStart:
+ *                 type: string
+ *                 format: date-time
+ *               scheduledEnd:
+ *                 type: string
+ *                 format: date-time
+ *               status:
+ *                 type: boolean
+ *                 default: true
+ *     responses:
+ *       201:
+ *         description: Planeación creada
+ *       400:
+ *         description: Datos inválidos
+ *       404:
+ *         description: Actividad no encontrada
+ */
+async function createSchedule(req, res) {
+  try {
+    const { activityId } = req.params;
+    const { scheduledStart, scheduledEnd, status = true } = req.body || {};
+    
+    if (!scheduledStart || !scheduledEnd) {
+      return sendErrorResponse(res, { status: 400, message: 'scheduledStart y scheduledEnd son requeridos' });
+    }
+    
+    // Verificar que la actividad existe
+    const activity = await activitiesService.getActivityById(activityId);
+    if (!activity) {
+      return sendErrorResponse(res, { status: 404, message: 'Actividad no encontrada' });
+    }
+    
+    const schedule = await activitiesService.createSchedule(activityId, {
+      scheduledStart,
+      scheduledEnd,
+      status
+    });
+    
+    res.status(201).json(schedule);
+  } catch (e) {
+    console.error(e);
+    sendErrorResponse(res, e, 500, 'Error al crear planeación');
+  }
+}
+
+/**
+ * @openapi
+ * /api/activities/schedules/{scheduleId}:
+ *   get:
+ *     tags: [Activities]
+ *     summary: Obtener una planeación por ID
+ */
+async function getScheduleById(req, res) {
+  try {
+    const { scheduleId } = req.params;
+    const schedule = await activitiesService.getScheduleById(scheduleId);
+    
+    if (!schedule) {
+      return sendErrorResponse(res, { status: 404, message: 'Planeación no encontrada' });
+    }
+    
+    res.json(schedule);
+  } catch (e) {
+    console.error(e);
+    sendErrorResponse(res, e, 500, 'Error al obtener planeación');
+  }
+}
+
+/**
+ * @openapi
+ * /api/activities/schedules/{scheduleId}:
+ *   put:
+ *     tags: [Activities]
+ *     summary: Actualizar una planeación
+ *     description: Actualiza los datos de una planeación existente
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               scheduledStart:
+ *                 type: string
+ *                 format: date-time
+ *               scheduledEnd:
+ *                 type: string
+ *                 format: date-time
+ *               status:
+ *                 type: boolean
+ *     responses:
+ *       200:
+ *         description: Planeación actualizada
+ *       404:
+ *         description: Planeación no encontrada
+ */
+async function updateSchedule(req, res) {
+  try {
+    const { scheduleId } = req.params;
+    const { scheduledStart, scheduledEnd, status } = req.body || {};
+    
+    const schedule = await activitiesService.updateSchedule(scheduleId, {
+      scheduledStart,
+      scheduledEnd,
+      status
+    });
+    
+    if (!schedule) {
+      return sendErrorResponse(res, { status: 404, message: 'Planeación no encontrada' });
+    }
+    
+    res.json(schedule);
+  } catch (e) {
+    console.error(e);
+    sendErrorResponse(res, e, 500, 'Error al actualizar planeación');
+  }
+}
+
+/**
+ * @openapi
+ * /api/activities/schedules/{scheduleId}/toggle-status:
+ *   put:
+ *     tags: [Activities]
+ *     summary: Activar o inactivar una planeación
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - status
+ *             properties:
+ *               status:
+ *                 type: boolean
+ */
+async function toggleScheduleStatus(req, res) {
+  try {
+    const { scheduleId } = req.params;
+    const { status } = req.body || {};
+    
+    if (typeof status !== 'boolean') {
+      return sendErrorResponse(res, { status: 400, message: 'status debe ser un booleano (true/false)' });
+    }
+    
+    const schedule = await activitiesService.toggleScheduleStatus(scheduleId, status);
+    
+    if (!schedule) {
+      return sendErrorResponse(res, { status: 404, message: 'Planeación no encontrada' });
+    }
+    
+    res.json(schedule);
+  } catch (e) {
+    console.error(e);
+    sendErrorResponse(res, e, 500, 'Error al cambiar estado de planeación');
+  }
+}
+
+/**
+ * @openapi
+ * /api/activities/schedules/{scheduleId}:
+ *   delete:
+ *     tags: [Activities]
+ *     summary: Eliminar una planeación (soft delete)
+ *     description: Inactiva una planeación cambiando su status a false
+ */
+async function deleteSchedule(req, res) {
+  try {
+    const { scheduleId } = req.params;
+    const schedule = await activitiesService.deleteSchedule(scheduleId);
+    
+    if (!schedule) {
+      return sendErrorResponse(res, { status: 404, message: 'Planeación no encontrada' });
+    }
+    
+    res.json({ message: 'Planeación eliminada correctamente', schedule });
+  } catch (e) {
+    console.error(e);
+    sendErrorResponse(res, e, 500, 'Error al eliminar planeación');
+  }
+}
+
+module.exports = { 
+  getByDate, 
+  list, 
+  getById, 
+  create, 
+  update, 
+  toggleStatus,
+  remove, 
+  replaceAssignments,
+  // Planeaciones
+  getSchedules,
+  createSchedule,
+  getScheduleById,
+  updateSchedule,
+  toggleScheduleStatus,
+  deleteSchedule,
+};

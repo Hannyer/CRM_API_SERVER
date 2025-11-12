@@ -1,71 +1,132 @@
 const activitiesRepo = require('../repository/activities.repository');
 const guidesRepo = require('../repository/guides.repository'); 
 const { pool } = require('../config/db.pg');
-const { AppError }   = require('../utils/AppError');
+const { AppError } = require('../utils/AppError');
 
 // Utilidad: obtiene la fecha (YYYY-MM-DD) a partir de un ISO string
 function toDateYMD(iso) {
-  // Usa la parte de fecha en la zona del cliente; si prefieres UTC, ajústalo
   return new Date(iso).toISOString().split('T')[0];
 }
 
 /**
- * Orquesta el create:
- * 1) crea actividad
- * 2) setea idiomas
- * 3) si autoAssign = true → busca disponibilidad por fecha y asigna
+ * Crea una actividad (sin fechas) y opcionalmente una planeación inicial
  */
-async function createActivityAndAssign(payload) {
+async function createActivity(payload) {
   const {
     activityTypeId,
     title,
     partySize,
-    start,
-    end,
     languageIds = [],
-    autoAssign = false,
-    capacityPerGuide = null, // ej: 12
+    status = true,
+    // Opcional: primera planeación al crear
+    scheduledStart,
+    scheduledEnd,
   } = payload;
 
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
-    // 1) crear actividad
-    const activity = await activitiesRepo.createActivity({ activityTypeId, title, partySize, start, end });
+    // 1) Crear actividad
+    const activity = await activitiesRepo.createActivity({ 
+      activityTypeId, 
+      title, 
+      partySize, 
+      status 
+    });
 
-    // 2) idiomas
+    // 2) Idiomas
     if (languageIds.length) {
       await activitiesRepo.setActivityLanguages(activity.id, languageIds);
     }
 
-    // 3) auto-asignación (simple):
-    // Regla: 1 líder obligatorio; resto guías normales hasta cubrir partySize usando capacityPerGuide
-    if (autoAssign) {
-      const date = toDateYMD(start);
+    // 3) Crear primera planeación si se proporciona
+    if (scheduledStart && scheduledEnd) {
+      await activitiesRepo.createSchedule(activity.id, {
+        scheduledStart,
+        scheduledEnd,
+        status: true
+      });
+    }
 
-      // Disponibles por fecha / filtros
+    await client.query('COMMIT');
+
+    // Devolver actividad completa
+    return activitiesRepo.getActivityById(activity.id);
+  } catch (e) {
+    await client.query('ROLLBACK');
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Crea una actividad y asigna guías automáticamente basado en la primera planeación
+ */
+async function createActivityAndAssign(payload) {
+  const {
+    activityTypeId,
+    title,
+    partySize,
+    scheduledStart,
+    scheduledEnd,
+    languageIds = [],
+    autoAssign = false,
+    capacityPerGuide = null,
+    status = true,
+  } = payload;
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 1) Crear actividad
+    const activity = await activitiesRepo.createActivity({ 
+      activityTypeId, 
+      title, 
+      partySize, 
+      status 
+    });
+
+    // 2) Idiomas
+    if (languageIds.length) {
+      await activitiesRepo.setActivityLanguages(activity.id, languageIds);
+    }
+
+    // 3) Crear planeación
+    if (scheduledStart && scheduledEnd) {
+      await activitiesRepo.createSchedule(activity.id, {
+        scheduledStart,
+        scheduledEnd,
+        status: true
+      });
+    }
+
+    // 4) Auto-asignación de guías
+    if (autoAssign && scheduledStart && scheduledEnd) {
+      const date = toDateYMD(scheduledStart);
+
       const available = await activitiesRepo.getGuidesAvailabilityByDate({
         date,
         activityTypeId,
         languageIds,
       });
 
-      // Separa líderes / normales
-      const leaders = available.filter(g => g.is_leader && !g.is_busy); // asumiendo columnas de la función
+      const leaders = available.filter(g => g.is_leader && !g.is_busy);
       const normals = available.filter(g => !g.is_leader && !g.is_busy);
 
       if (!leaders.length) {
-      throw new AppError(
-        'No hay guías líderes disponibles',
-        409,
-        'NO_LEADERS_AVAILABLE',
-        { activityId: activity.id, date: start, languageIds }
-      );
-    }
+        throw new AppError(
+          'No hay guías líderes disponibles',
+          409,
+          'NO_LEADERS_AVAILABLE',
+          { activityId: activity.id, date: scheduledStart, languageIds }
+        );
+      }
 
-      const leader = leaders[0]; // la regla puede ser rotativa más adelante
-      const perGuide = capacityPerGuide ?? 12; // default simple
+      const leader = leaders[0];
+      const perGuide = capacityPerGuide ?? 12;
       const guidesNeeded = Math.max(1, Math.ceil((partySize - perGuide) / perGuide) + 1);
 
       const chosen = [leader];
@@ -84,14 +145,7 @@ async function createActivityAndAssign(payload) {
 
     await client.query('COMMIT');
 
-    return {
-      id: activity.id,
-      title: activity.title,
-      partySize: activity.party_size,
-      start: activity.start_time,
-      end: activity.end_time,
-      autoAssigned: !!autoAssign,
-    };
+    return activitiesRepo.getActivityById(activity.id);
   } catch (e) {
     await client.query('ROLLBACK');
     throw e;
@@ -101,7 +155,6 @@ async function createActivityAndAssign(payload) {
 }
 
 async function replaceAssignments(activityId, assignments = []) {
-
   await activitiesRepo.replaceAssignments(activityId, assignments);
 }
 
@@ -109,15 +162,15 @@ async function getActivitiesByDate(date) {
   return activitiesRepo.getActivitiesByDate(date);
 }
 
-async function listActivities({ page, limit } = {}) {
-  return activitiesRepo.listActivities({ page, limit });
+async function listActivities({ page, limit, status } = {}) {
+  return activitiesRepo.listActivities({ page, limit, status });
 }
 
 async function getActivityById(activityId) {
   return activitiesRepo.getActivityById(activityId);
 }
 
-async function updateActivity(activityId, { activityTypeId, title, partySize, start, end, languageIds }) {
+async function updateActivity(activityId, { activityTypeId, title, partySize, status, languageIds }) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -127,8 +180,7 @@ async function updateActivity(activityId, { activityTypeId, title, partySize, st
       activityTypeId,
       title,
       partySize,
-      start,
-      end
+      status
     });
 
     if (!activity) {
@@ -152,16 +204,56 @@ async function updateActivity(activityId, { activityTypeId, title, partySize, st
   }
 }
 
+async function toggleActivityStatus(activityId, status) {
+  return activitiesRepo.toggleActivityStatus(activityId, status);
+}
+
 async function deleteActivity(activityId) {
   return activitiesRepo.deleteActivity(activityId);
 }
 
+// ========== SERVICIOS PARA PLANEACIONES ==========
+
+async function createSchedule(activityId, { scheduledStart, scheduledEnd, status = true }) {
+  return activitiesRepo.createSchedule(activityId, { scheduledStart, scheduledEnd, status });
+}
+
+async function getScheduleById(scheduleId) {
+  return activitiesRepo.getScheduleById(scheduleId);
+}
+
+async function getSchedulesByActivityId(activityId) {
+  return activitiesRepo.getSchedulesByActivityId(activityId);
+}
+
+async function updateSchedule(scheduleId, { scheduledStart, scheduledEnd, status }) {
+  return activitiesRepo.updateSchedule(scheduleId, { scheduledStart, scheduledEnd, status });
+}
+
+async function deleteSchedule(scheduleId) {
+  return activitiesRepo.deleteSchedule(scheduleId);
+}
+
+async function toggleScheduleStatus(scheduleId, status) {
+  return activitiesRepo.toggleScheduleStatus(scheduleId, status);
+}
+
 module.exports = {
+  // Actividades
+  createActivity,
   createActivityAndAssign,
   replaceAssignments,
   getActivitiesByDate,
   listActivities,
   getActivityById,
   updateActivity,
+  toggleActivityStatus,
   deleteActivity,
+  // Planeaciones
+  createSchedule,
+  getScheduleById,
+  getSchedulesByActivityId,
+  updateSchedule,
+  deleteSchedule,
+  toggleScheduleStatus,
 };
