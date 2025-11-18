@@ -18,9 +18,6 @@ async function createActivity(payload) {
     partySize,
     languageIds = [],
     status = true,
-    // Opcional: primera planeación al crear
-    scheduledStart,
-    scheduledEnd,
   } = payload;
 
   const client = await pool.connect();
@@ -35,20 +32,8 @@ async function createActivity(payload) {
       status 
     });
 
-    // 2) Idiomas
-    if (languageIds.length) {
-      await activitiesRepo.setActivityLanguages(activity.id, languageIds);
-    }
-
-    // 3) Crear primera planeación si se proporciona
-    if (scheduledStart && scheduledEnd) {
-      await activitiesRepo.createSchedule(activity.id, {
-        scheduledStart,
-        scheduledEnd,
-        status: true
-      });
-    }
-
+  
+ 
     await client.query('COMMIT');
 
     // Devolver actividad completa
@@ -69,11 +54,6 @@ async function createActivityAndAssign(payload) {
     activityTypeId,
     title,
     partySize,
-    scheduledStart,
-    scheduledEnd,
-    languageIds = [],
-    autoAssign = false,
-    capacityPerGuide = null,
     status = true,
   } = payload;
 
@@ -89,59 +69,6 @@ async function createActivityAndAssign(payload) {
       status 
     });
 
-    // 2) Idiomas
-    if (languageIds.length) {
-      await activitiesRepo.setActivityLanguages(activity.id, languageIds);
-    }
-
-    // 3) Crear planeación
-    if (scheduledStart && scheduledEnd) {
-      await activitiesRepo.createSchedule(activity.id, {
-        scheduledStart,
-        scheduledEnd,
-        status: true
-      });
-    }
-
-    // 4) Auto-asignación de guías
-    if (autoAssign && scheduledStart && scheduledEnd) {
-      const date = toDateYMD(scheduledStart);
-
-      const available = await activitiesRepo.getGuidesAvailabilityByDate({
-        date,
-        activityTypeId,
-        languageIds,
-      });
-
-      const leaders = available.filter(g => g.is_leader && !g.is_busy);
-      const normals = available.filter(g => !g.is_leader && !g.is_busy);
-
-      if (!leaders.length) {
-        throw new AppError(
-          'No hay guías líderes disponibles',
-          409,
-          'NO_LEADERS_AVAILABLE',
-          { activityId: activity.id, date: scheduledStart, languageIds }
-        );
-      }
-
-      const leader = leaders[0];
-      const perGuide = capacityPerGuide ?? 12;
-      const guidesNeeded = Math.max(1, Math.ceil((partySize - perGuide) / perGuide) + 1);
-
-      const chosen = [leader];
-      for (const g of normals) {
-        if (chosen.length >= guidesNeeded) break;
-        chosen.push(g);
-      }
-
-      const assignments = chosen.map((g, idx) => ({
-        guideId: g.id,
-        isLeader: idx === 0,
-      }));
-
-      await activitiesRepo.insertAssignments(activity.id, assignments);
-    }
 
     await client.query('COMMIT');
 

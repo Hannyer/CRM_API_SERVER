@@ -74,3 +74,69 @@ COMMENT ON COLUMN ops.activity_schedule.scheduled_end IS 'Fecha y hora de fin pr
 COMMENT ON COLUMN ops.activity_schedule.status IS 'Estado de la planeación: true = activa, false = inactiva';
 COMMENT ON COLUMN ops.activity.status IS 'Estado de la actividad: true = activa, false = inactiva';
 
+async function getActivityById(activityId) {
+  const { rows } = await pool.query(
+    `
+    SELECT 
+      a.id,
+      a.title,
+      a.party_size as "partySize",
+      a.status,
+      at.id as "activityTypeId",
+      at.name as "activityTypeName",
+      at.description as "activityTypeDescription",
+      COALESCE(
+        (
+          SELECT json_agg(
+            json_build_object(
+              'id', s.id,
+              'scheduledStart', s.scheduled_start,
+              'scheduledEnd', s.scheduled_end,
+              'status', s.status
+            ) ORDER BY s.scheduled_start ASC
+          )
+          FROM ops.activity_schedule s
+          WHERE s.activity_id = a.id
+        ),
+        '[]'::json
+      ) AS schedules,
+      COALESCE(
+        (
+          SELECT json_agg(
+            json_build_object(
+              'id', g.id,
+              'name', g.name,
+              'email', g.email,
+              'isLeader', aa.is_leader
+            ) ORDER BY aa.is_leader DESC, g.name
+          )
+          FROM ops.activity_assignment aa
+          JOIN ops.guide g ON g.id = aa.guide_id
+          WHERE aa.activity_id = a.id
+        ),
+        '[]'::json
+      ) AS guides,
+      COALESCE(
+        (
+          SELECT json_agg(
+            json_build_object(
+              'id', l.id,
+              'code', l.code,
+              'name', l.name
+            ) ORDER BY l.name
+          )
+          FROM ops.activity_language al
+          JOIN ops.language l ON l.id = al.language_id
+          WHERE al.activity_id = a.id
+        ),
+        '[]'::json
+      ) AS languages
+    FROM ops.activity a
+    JOIN ops.activity_type at ON at.id = a.activity_type_id
+    WHERE a.id = $1::uuid
+    `,
+    [activityId]
+  );
+
+  return rows[0] || null;
+}
