@@ -85,8 +85,9 @@ async function checkAvailability(scheduleId) {
 async function createBooking({
   activityScheduleId,
   companyId = null,
-  transportId = null,
+  transport = false,
   numberOfPeople,
+  passengerCount = null,
   commissionPercentage,
   customerName,
   customerEmail = null,
@@ -98,8 +99,9 @@ async function createBooking({
     INSERT INTO ops.booking (
       activity_schedule_id, 
       company_id, 
-      transport_id, 
-      number_of_people, 
+      transport, 
+      number_of_people,
+      passenger_count,
       commission_percentage,
       customer_name,
       customer_email,
@@ -107,13 +109,14 @@ async function createBooking({
       status,
       created_by
     )
-    VALUES ($1::uuid, $2::uuid, $3::uuid, $4::int, $5::numeric, $6, $7, $8, $9, $10::uuid)
+    VALUES ($1::uuid, $2::uuid, $3::bool, $4::int, $5::int, $6::numeric, $7, $8, $9, $10, $11::uuid)
     RETURNING 
       id,
       activity_schedule_id as "activityScheduleId",
       company_id as "companyId",
-      transport_id as "transportId",
+      transport,
       number_of_people as "numberOfPeople",
+      passenger_count as "passengerCount",
       commission_percentage as "commissionPercentage",
       customer_name as "customerName",
       customer_email as "customerEmail",
@@ -126,8 +129,9 @@ async function createBooking({
   const params = [
     activityScheduleId,
     companyId,
-    transportId,
+    transport,
     numberOfPeople,
+    passengerCount,
     commissionPercentage,
     customerName,
     customerEmail,
@@ -174,8 +178,9 @@ async function listBookings({ page = 1, limit = 10, status = null, activitySched
       b.id,
       b.activity_schedule_id as "activityScheduleId",
       b.company_id as "companyId",
-      b.transport_id as "transportId",
+      b.transport,
       b.number_of_people as "numberOfPeople",
+      b.passenger_count as "passengerCount",
       b.commission_percentage as "commissionPercentage",
       b.customer_name as "customerName",
       b.customer_email as "customerEmail",
@@ -187,13 +192,11 @@ async function listBookings({ page = 1, limit = 10, status = null, activitySched
       a.title as "activityTitle",
       s.scheduled_start as "scheduledStart",
       s.scheduled_end as "scheduledEnd",
-      c.name as "companyName",
-      t.model as "transportModel"
+      c.name as "companyName"
     FROM ops.booking b
     JOIN ops.activity_schedule s ON s.id = b.activity_schedule_id
     JOIN ops.activity a ON a.id = s.activity_id
     LEFT JOIN ops.company c ON c.id = b.company_id
-    LEFT JOIN ops.transport t ON t.id = b.transport_id
     ${whereClause}
     ORDER BY b.created_at DESC
     LIMIT $${paramIndex++} OFFSET $${paramIndex}
@@ -220,8 +223,9 @@ async function getBookingById(bookingId) {
       b.id,
       b.activity_schedule_id as "activityScheduleId",
       b.company_id as "companyId",
-      b.transport_id as "transportId",
+      b.transport,
       b.number_of_people as "numberOfPeople",
+      b.passenger_count as "passengerCount",
       b.commission_percentage as "commissionPercentage",
       b.customer_name as "customerName",
       b.customer_email as "customerEmail",
@@ -236,14 +240,11 @@ async function getBookingById(bookingId) {
       s.scheduled_start as "scheduledStart",
       s.scheduled_end as "scheduledEnd",
       c.name as "companyName",
-      c.commission_percentage as "companyCommissionPercentage",
-      t.model as "transportModel",
-      t.capacity as "transportCapacity"
+      c.commission_percentage as "companyCommissionPercentage"
     FROM ops.booking b
     JOIN ops.activity_schedule s ON s.id = b.activity_schedule_id
     JOIN ops.activity a ON a.id = s.activity_id
     LEFT JOIN ops.company c ON c.id = b.company_id
-    LEFT JOIN ops.transport t ON t.id = b.transport_id
     WHERE b.id = $1::uuid
     `,
     [bookingId]
@@ -258,8 +259,9 @@ async function getBookingById(bookingId) {
 async function updateBooking(bookingId, {
   activityScheduleId,
   companyId,
-  transportId,
+  transport,
   numberOfPeople,
+  passengerCount,
   commissionPercentage,
   customerName,
   customerEmail,
@@ -278,13 +280,17 @@ async function updateBooking(bookingId, {
     updates.push(`company_id = $${paramIndex++}::uuid`);
     params.push(companyId);
   }
-  if (transportId !== undefined) {
-    updates.push(`transport_id = $${paramIndex++}::uuid`);
-    params.push(transportId);
+  if (transport !== undefined) {
+    updates.push(`transport = $${paramIndex++}::bool`);
+    params.push(transport);
   }
   if (numberOfPeople !== undefined) {
     updates.push(`number_of_people = $${paramIndex++}::int`);
     params.push(numberOfPeople);
+  }
+  if (passengerCount !== undefined) {
+    updates.push(`passenger_count = $${paramIndex++}::int`);
+    params.push(passengerCount);
   }
   if (commissionPercentage !== undefined) {
     updates.push(`commission_percentage = $${paramIndex++}::numeric`);
@@ -323,8 +329,9 @@ async function updateBooking(bookingId, {
       id,
       activity_schedule_id as "activityScheduleId",
       company_id as "companyId",
-      transport_id as "transportId",
+      transport,
       number_of_people as "numberOfPeople",
+      passenger_count as "passengerCount",
       commission_percentage as "commissionPercentage",
       customer_name as "customerName",
       customer_email as "customerEmail",

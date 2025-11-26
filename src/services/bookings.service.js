@@ -1,7 +1,6 @@
 const bookingsRepo = require('../repository/bookings.repository');
 const companiesRepo = require('../repository/companies.repository');
 const { AppError } = require('../utils/AppError');
-const { pool } = require('../config/db.pg');
 
 /**
  * Obtiene las fechas disponibles (planeaciones) para una actividad específica
@@ -24,8 +23,9 @@ async function createBooking(payload) {
   const {
     activityScheduleId,
     companyId = null,
-    transportId = null,
+    transport = false,
     numberOfPeople,
+    passengerCount = null,
     commissionPercentage = null, // Si es null, se usa el de la compañía
     customerName,
     customerEmail = null,
@@ -80,29 +80,10 @@ async function createBooking(payload) {
     throw new AppError('El porcentaje de comisión debe estar entre 0 y 100', 400);
   }
 
-  // Validar transporte si se proporciona
-  if (transportId) {
-    const { rows } = await pool.query(
-      `SELECT id, capacity, operational_status, status 
-       FROM ops.transport 
-       WHERE id = $1::uuid`,
-      [transportId]
-    );
-    
-    if (rows.length === 0) {
-      throw new AppError('El transporte especificado no existe', 404);
-    }
-    
-    const transport = rows[0];
-    if (!transport.operational_status || !transport.status) {
-      throw new AppError('El transporte especificado no está disponible', 400);
-    }
-    
-    if (transport.capacity < numberOfPeople) {
-      throw new AppError(
-        `El transporte no tiene suficiente capacidad. Capacidad: ${transport.capacity}, personas: ${numberOfPeople}`,
-        400
-      );
+  // Validar passenger_count si transport es true
+  if (transport && passengerCount !== null && passengerCount !== undefined) {
+    if (passengerCount < 0) {
+      throw new AppError('passengerCount no puede ser negativo', 400);
     }
   }
 
@@ -110,8 +91,9 @@ async function createBooking(payload) {
   const booking = await bookingsRepo.createBooking({
     activityScheduleId,
     companyId,
-    transportId,
+    transport,
     numberOfPeople,
+    passengerCount,
     commissionPercentage: finalCommissionPercentage,
     customerName,
     customerEmail,
@@ -144,8 +126,9 @@ async function updateBooking(bookingId, payload) {
   const {
     activityScheduleId,
     companyId,
-    transportId,
+    transport,
     numberOfPeople,
+    passengerCount,
     commissionPercentage,
     customerName,
     customerEmail,
@@ -191,30 +174,10 @@ async function updateBooking(bookingId, payload) {
     }
   }
 
-  // Validar transporte si se proporciona
-  if (transportId !== undefined && transportId !== null) {
-    const { rows } = await pool.query(
-      `SELECT id, capacity, operational_status, status 
-       FROM ops.transport 
-       WHERE id = $1::uuid`,
-      [transportId]
-    );
-    
-    if (rows.length === 0) {
-      throw new AppError('El transporte especificado no existe', 404);
-    }
-    
-    const transport = rows[0];
-    if (!transport.operational_status || !transport.status) {
-      throw new AppError('El transporte especificado no está disponible', 400);
-    }
-    
-    const peopleToCheck = numberOfPeople || (await bookingsRepo.getBookingById(bookingId))?.numberOfPeople || 0;
-    if (transport.capacity < peopleToCheck) {
-      throw new AppError(
-        `El transporte no tiene suficiente capacidad. Capacidad: ${transport.capacity}, personas: ${peopleToCheck}`,
-        400
-      );
+  // Validar passenger_count si transport es true
+  if (transport !== undefined && transport && passengerCount !== null && passengerCount !== undefined) {
+    if (passengerCount < 0) {
+      throw new AppError('passengerCount no puede ser negativo', 400);
     }
   }
 

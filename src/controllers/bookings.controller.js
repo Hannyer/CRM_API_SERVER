@@ -127,7 +127,7 @@ async function checkAvailability(req, res) {
  *   post:
  *     tags: [Bookings]
  *     summary: Crear una nueva reserva
- *     description: Crea una nueva reserva de actividad. Valida disponibilidad de espacios, puede asociar una compañía (socio) con comisión parametrizada o manual, y opcionalmente asignar transporte.
+ *     description: Crea una nueva reserva de actividad. Valida disponibilidad de espacios, puede asociar una compañía (socio) con comisión parametrizada o manual, y opcionalmente indicar si se requiere transporte con cantidad de pasajeros.
  *     requestBody:
  *       required: true
  *       content:
@@ -147,14 +147,18 @@ async function checkAvailability(req, res) {
  *                 type: string
  *                 format: uuid
  *                 description: ID de la compañía (socio) - opcional. Si se proporciona, se usará su comisión parametrizada a menos que se especifique commissionPercentage manualmente
- *               transportId:
- *                 type: string
- *                 format: uuid
- *                 description: ID del transporte requerido - opcional
+ *               transport:
+ *                 type: boolean
+ *                 default: false
+ *                 description: Indica si se requiere transporte para la reserva
  *               numberOfPeople:
  *                 type: integer
  *                 minimum: 1
  *                 description: Cantidad de personas en la reserva
+ *               passengerCount:
+ *                 type: integer
+ *                 minimum: 0
+ *                 description: Cantidad de pasajeros para el transporte (opcional, solo si transport es true)
  *               commissionPercentage:
  *                 type: number
  *                 format: float
@@ -198,12 +202,13 @@ async function checkAvailability(req, res) {
  *                   type: string
  *                   format: uuid
  *                   nullable: true
- *                 transportId:
- *                   type: string
- *                   format: uuid
- *                   nullable: true
+ *                 transport:
+ *                   type: boolean
  *                 numberOfPeople:
  *                   type: integer
+ *                 passengerCount:
+ *                   type: integer
+ *                   nullable: true
  *                 commissionPercentage:
  *                   type: number
  *                   format: float
@@ -319,12 +324,13 @@ async function create(req, res) {
  *                         type: string
  *                         format: uuid
  *                         nullable: true
- *                       transportId:
- *                         type: string
- *                         format: uuid
- *                         nullable: true
+ *                       transport:
+ *                         type: boolean
  *                       numberOfPeople:
  *                         type: integer
+ *                       passengerCount:
+ *                         type: integer
+ *                         nullable: true
  *                       commissionPercentage:
  *                         type: number
  *                         format: float
@@ -347,9 +353,6 @@ async function create(req, res) {
  *                         type: string
  *                         format: date-time
  *                       companyName:
- *                         type: string
- *                         nullable: true
- *                       transportModel:
  *                         type: string
  *                         nullable: true
  *                 pagination:
@@ -455,18 +458,13 @@ async function list(req, res) {
  *                   type: number
  *                   format: float
  *                   nullable: true
- *                 transportId:
- *                   type: string
- *                   format: uuid
- *                   nullable: true
- *                 transportModel:
- *                   type: string
- *                   nullable: true
- *                 transportCapacity:
- *                   type: integer
- *                   nullable: true
+ *                 transport:
+ *                   type: boolean
  *                 numberOfPeople:
  *                   type: integer
+ *                 passengerCount:
+ *                   type: integer
+ *                   nullable: true
  *                 commissionPercentage:
  *                   type: number
  *                   format: float
@@ -537,14 +535,17 @@ async function getById(req, res) {
  *                 type: string
  *                 format: uuid
  *                 description: Nueva compañía asociada (puede ser null para eliminar)
- *               transportId:
- *                 type: string
- *                 format: uuid
- *                 description: Nuevo transporte asignado (puede ser null para eliminar)
+ *               transport:
+ *                 type: boolean
+ *                 description: Indica si se requiere transporte para la reserva
  *               numberOfPeople:
  *                 type: integer
  *                 minimum: 1
  *                 description: Nueva cantidad de personas
+ *               passengerCount:
+ *                 type: integer
+ *                 minimum: 0
+ *                 description: Nueva cantidad de pasajeros para el transporte (opcional, solo si transport es true)
  *               commissionPercentage:
  *                 type: number
  *                 format: float
