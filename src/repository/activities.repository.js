@@ -107,6 +107,9 @@ async function getActivitiesByDate(date) {
       s.id as "scheduleId",
       s.scheduled_start as "scheduledStart",
       s.scheduled_end as "scheduledEnd",
+      s.capacity,
+      s.booked_count as "bookedCount",
+      (s.capacity - s.booked_count) as "availableSpots",
       s.status as "scheduleStatus",
       at.id as "activityTypeId",
       at.name as "activityTypeName",
@@ -323,14 +326,14 @@ async function deleteActivity(activityId) {
 /**
  * Crea una nueva planeación para una actividad
  */
-async function createSchedule(activityId, { scheduledStart, scheduledEnd, status = true }) {
+async function createSchedule(activityId, { scheduledStart, scheduledEnd, capacity = 0, status = true }) {
   const sql = `
-    INSERT INTO ops.activity_schedule (activity_id, scheduled_start, scheduled_end, status)
-    VALUES ($1::uuid, $2::timestamptz, $3::timestamptz, $4::bool)
+    INSERT INTO ops.activity_schedule (activity_id, scheduled_start, scheduled_end, capacity, booked_count, status)
+    VALUES ($1::uuid, $2::timestamptz, $3::timestamptz, $4::int, 0, $5::bool)
     RETURNING id, activity_id as "activityId", scheduled_start as "scheduledStart", 
-               scheduled_end as "scheduledEnd", status;
+               scheduled_end as "scheduledEnd", capacity, booked_count as "bookedCount", status;
   `;
-  const params = [activityId, scheduledStart, scheduledEnd, status];
+  const params = [activityId, scheduledStart, scheduledEnd, capacity, status];
   const { rows } = await pool.query(sql, params);
   return rows[0];
 }
@@ -346,6 +349,9 @@ async function getScheduleById(scheduleId) {
       s.activity_id as "activityId",
       s.scheduled_start as "scheduledStart",
       s.scheduled_end as "scheduledEnd",
+      s.capacity,
+      s.booked_count as "bookedCount",
+      (s.capacity - s.booked_count) as "availableSpots",
       s.status,
       a.title as "activityTitle"
     FROM ops.activity_schedule s
@@ -369,6 +375,9 @@ async function getSchedulesByActivityId(activityId) {
       activity_id as "activityId",
       scheduled_start as "scheduledStart",
       scheduled_end as "scheduledEnd",
+      capacity,
+      booked_count as "bookedCount",
+      (capacity - booked_count) as "availableSpots",
       status
     FROM ops.activity_schedule
     WHERE activity_id = $1::uuid
@@ -383,7 +392,7 @@ async function getSchedulesByActivityId(activityId) {
 /**
  * Actualiza una planeación
  */
-async function updateSchedule(scheduleId, { scheduledStart, scheduledEnd, status }) {
+async function updateSchedule(scheduleId, { scheduledStart, scheduledEnd, capacity, status }) {
   const updates = [];
   const params = [];
   let paramIndex = 1;
@@ -395,6 +404,10 @@ async function updateSchedule(scheduleId, { scheduledStart, scheduledEnd, status
   if (scheduledEnd !== undefined) {
     updates.push(`scheduled_end = $${paramIndex++}::timestamptz`);
     params.push(scheduledEnd);
+  }
+  if (capacity !== undefined) {
+    updates.push(`capacity = $${paramIndex++}::int`);
+    params.push(capacity);
   }
   if (status !== undefined) {
     updates.push(`status = $${paramIndex++}::bool`);
@@ -411,7 +424,7 @@ async function updateSchedule(scheduleId, { scheduledStart, scheduledEnd, status
     SET ${updates.join(', ')}
     WHERE id = $${paramIndex}::uuid
     RETURNING id, activity_id as "activityId", scheduled_start as "scheduledStart", 
-               scheduled_end as "scheduledEnd", status;
+               scheduled_end as "scheduledEnd", capacity, booked_count as "bookedCount", status;
   `;
 
   const { rows } = await pool.query(sql, params);
@@ -449,7 +462,7 @@ async function toggleScheduleStatus(scheduleId, status) {
     SET status = $1::bool
     WHERE id = $2::uuid
     RETURNING id, activity_id as "activityId", scheduled_start as "scheduledStart", 
-               scheduled_end as "scheduledEnd", status;
+               scheduled_end as "scheduledEnd", capacity, booked_count as "bookedCount", status;
     `,
     [status, scheduleId]
   );
@@ -459,6 +472,149 @@ async function toggleScheduleStatus(scheduleId, status) {
   }
 
   return rows[0];
+}
+
+// ========== NUEVAS FUNCIONES PARA CAPACIDAD Y RESERVAS ==========
+
+/**
+ * Inserción masiva de horarios para una actividad en un rango de fechas
+ * @param {string} activityId - ID de la actividad
+ * @param {Date|string} startDate - Fecha de inicio (YYYY-MM-DD)
+ * @param {Date|string} endDate - Fecha de fin (YYYY-MM-DD)
+ * @param {Array} timeSlots - Array de objetos con {startTime, endTime, capacity}
+ * @param {boolean} validateOverlaps - Si true, valida solapamientos antes de insertar
+ * @returns {Object} Resultado de la operación con createdCount o conflicts
+ */
+async function bulkCreateSchedules(activityId, startDate, endDate, timeSlots, validateOverlaps = true) {
+  // Convertir fechas a formato YYYY-MM-DD si son objetos Date
+  const startDateStr = startDate instanceof Date ? startDate.toISOString().split('T')[0] : startDate;
+  const endDateStr = endDate instanceof Date ? endDate.toISOString().split('T')[0] : endDate;
+
+  // Validar que timeSlots sea un array
+  if (!Array.isArray(timeSlots) || timeSlots.length === 0) {
+    throw new Error('timeSlots debe ser un array no vacío');
+  }
+
+  // Validar formato de cada timeSlot
+  for (const slot of timeSlots) {
+    if (!slot.startTime || !slot.endTime) {
+      throw new Error('Cada timeSlot debe tener startTime y endTime');
+    }
+    if (slot.capacity === undefined || slot.capacity < 0) {
+      throw new Error('Cada timeSlot debe tener capacity >= 0');
+    }
+  }
+
+  const { rows } = await pool.query(
+    `SELECT * FROM ops.bulk_create_schedules($1::uuid, $2::date, $3::date, $4::jsonb, $5::bool)`,
+    [activityId, startDateStr, endDateStr, JSON.stringify(timeSlots), validateOverlaps]
+  );
+
+  const result = rows[0].bulk_create_schedules;
+  
+  if (!result.success) {
+    const error = new Error(result.message || 'Error al crear horarios');
+    error.code = result.error;
+    error.conflicts = result.conflicts;
+    throw error;
+  }
+
+  return result;
+}
+
+/**
+ * Suma asistentes a un horario específico con bloqueo FOR UPDATE
+ * @param {string} scheduleId - ID del horario
+ * @param {number} quantity - Cantidad de asistentes a agregar
+ * @returns {Object} Resultado con información actualizada del horario
+ */
+async function addAttendeesToSchedule(scheduleId, quantity) {
+  if (!quantity || quantity <= 0) {
+    throw new Error('La cantidad debe ser mayor a 0');
+  }
+
+  const { rows } = await pool.query(
+    `SELECT * FROM ops.add_attendees_to_schedule($1::uuid, $2::int)`,
+    [scheduleId, quantity]
+  );
+
+  const result = rows[0].add_attendees_to_schedule;
+
+  if (!result.success) {
+    const error = new Error(result.message || 'Error al agregar asistentes');
+    error.code = result.error;
+    error.currentBooked = result.currentBooked;
+    error.capacity = result.capacity;
+    error.available = result.available;
+    error.requested = result.requested;
+    throw error;
+  }
+
+  return result;
+}
+
+/**
+ * Consulta disponibilidad de horarios
+ * @param {Object} filters - Filtros opcionales {activityId, startDate, endDate}
+ * @returns {Array} Array de horarios con información de disponibilidad
+ */
+async function getScheduleAvailability(filters = {}) {
+  const { activityId = null, startDate = null, endDate = null } = filters;
+
+  const { rows } = await pool.query(
+    `SELECT * FROM ops.get_schedule_availability($1::uuid, $2::date, $3::date)`,
+    [
+      activityId || null,
+      startDate || null,
+      endDate || null
+    ]
+  );
+
+  return rows.map(row => ({
+    scheduleId: row.schedule_id,
+    activityId: row.activity_id,
+    activityTitle: row.activity_title,
+    scheduledDate: row.scheduled_date,
+    startTime: row.start_time,
+    endTime: row.end_time,
+    capacity: row.capacity,
+    bookedCount: row.booked_count,
+    availableSpots: row.available_spots,
+    status: row.status
+  }));
+}
+
+/**
+ * Obtiene horarios disponibles por día para una actividad
+ * @param {string} activityId - ID de la actividad
+ * @param {Date|string} date - Fecha específica (YYYY-MM-DD)
+ * @returns {Array} Array de horarios disponibles para ese día
+ */
+async function getAvailableSchedulesByDate(activityId, date) {
+  const dateStr = date instanceof Date ? date.toISOString().split('T')[0] : date;
+
+  const { rows } = await pool.query(
+    `
+    SELECT 
+      s.id,
+      s.activity_id as "activityId",
+      s.scheduled_start as "scheduledStart",
+      s.scheduled_end as "scheduledEnd",
+      s.capacity,
+      s.booked_count as "bookedCount",
+      (s.capacity - s.booked_count) as "availableSpots",
+      s.status
+    FROM ops.activity_schedule s
+    WHERE s.activity_id = $1::uuid
+      AND DATE(s.scheduled_start) = $2::date
+      AND s.status = true
+      AND (s.capacity - s.booked_count) > 0
+    ORDER BY s.scheduled_start ASC
+    `,
+    [activityId, dateStr]
+  );
+
+  return rows;
 }
 
 module.exports = {
@@ -481,4 +637,9 @@ module.exports = {
   updateSchedule,
   deleteSchedule,
   toggleScheduleStatus,
+  // Capacidad y reservas
+  bulkCreateSchedules,
+  addAttendeesToSchedule,
+  getScheduleAvailability,
+  getAvailableSchedulesByDate,
 };

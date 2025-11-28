@@ -378,7 +378,7 @@ async function getSchedules(req, res) {
 async function createSchedule(req, res) {
   try {
     const { activityId } = req.params;
-    const { scheduledStart, scheduledEnd, status = true } = req.body || {};
+    const { scheduledStart, scheduledEnd, capacity = 0, status = true } = req.body || {};
     
     if (!scheduledStart || !scheduledEnd) {
       return sendErrorResponse(res, { status: 400, message: 'scheduledStart y scheduledEnd son requeridos' });
@@ -393,6 +393,7 @@ async function createSchedule(req, res) {
     const schedule = await activitiesService.createSchedule(activityId, {
       scheduledStart,
       scheduledEnd,
+      capacity,
       status
     });
     
@@ -456,11 +457,12 @@ async function getScheduleById(req, res) {
 async function updateSchedule(req, res) {
   try {
     const { scheduleId } = req.params;
-    const { scheduledStart, scheduledEnd, status } = req.body || {};
+    const { scheduledStart, scheduledEnd, capacity, status } = req.body || {};
     
     const schedule = await activitiesService.updateSchedule(scheduleId, {
       scheduledStart,
       scheduledEnd,
+      capacity,
       status
     });
     
@@ -539,6 +541,273 @@ async function deleteSchedule(req, res) {
   }
 }
 
+// ========== CONTROLADORES PARA CAPACIDAD Y RESERVAS ==========
+
+/**
+ * @openapi
+ * /api/activities/{activityId}/schedules/bulk:
+ *   post:
+ *     tags: [Activities]
+ *     summary: Inserción masiva de horarios
+ *     description: Crea múltiples horarios para una actividad en un rango de fechas con validación de solapamientos
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - startDate
+ *               - endDate
+ *               - timeSlots
+ *             properties:
+ *               startDate:
+ *                 type: string
+ *                 format: date
+ *                 example: '2024-03-01'
+ *               endDate:
+ *                 type: string
+ *                 format: date
+ *                 example: '2024-03-10'
+ *               timeSlots:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   required:
+ *                     - startTime
+ *                     - endTime
+ *                     - capacity
+ *                   properties:
+ *                     startTime:
+ *                       type: string
+ *                       format: time
+ *                       example: '08:00'
+ *                     endTime:
+ *                       type: string
+ *                       format: time
+ *                       example: '11:00'
+ *                     capacity:
+ *                       type: integer
+ *                       example: 20
+ *               validateOverlaps:
+ *                 type: boolean
+ *                 default: true
+ *     responses:
+ *       201:
+ *         description: Horarios creados exitosamente
+ *       400:
+ *         description: Datos inválidos o conflictos de horarios
+ */
+async function bulkCreateSchedules(req, res) {
+  try {
+    const { activityId } = req.params;
+    const { startDate, endDate, timeSlots, validateOverlaps = true } = req.body || {};
+    
+    if (!startDate || !endDate || !timeSlots) {
+      return sendErrorResponse(res, { 
+        status: 400, 
+        message: 'startDate, endDate y timeSlots son requeridos' 
+      });
+    }
+
+    if (!Array.isArray(timeSlots) || timeSlots.length === 0) {
+      return sendErrorResponse(res, { 
+        status: 400, 
+        message: 'timeSlots debe ser un array no vacío' 
+      });
+    }
+
+    const result = await activitiesService.bulkCreateSchedules(
+      activityId,
+      startDate,
+      endDate,
+      timeSlots,
+      validateOverlaps
+    );
+
+    res.status(201).json(result);
+  } catch (e) {
+    console.error(e);
+    
+    // Manejar errores específicos
+    if (e.code === 'SCHEDULE_CONFLICTS') {
+      return res.status(409).json({
+        message: e.message || 'Se encontraron conflictos de horarios',
+        code: e.code,
+        conflicts: e.conflicts
+      });
+    }
+    
+    if (e.code === 'ACTIVITY_NOT_FOUND') {
+      return sendErrorResponse(res, { status: 404, message: e.message || 'Actividad no encontrada' });
+    }
+
+    sendErrorResponse(res, e, 500, 'Error al crear horarios masivamente');
+  }
+}
+
+/**
+ * @openapi
+ * /api/activities/schedules/{scheduleId}/attendees:
+ *   post:
+ *     tags: [Activities]
+ *     summary: Sumar asistentes a un horario
+ *     description: Agrega una cantidad de asistentes a un horario específico con validación de capacidad
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - quantity
+ *             properties:
+ *               quantity:
+ *                 type: integer
+ *                 minimum: 1
+ *                 example: 3
+ *     responses:
+ *       200:
+ *         description: Asistentes agregados exitosamente
+ *       409:
+ *         description: Capacidad excedida
+ *       404:
+ *         description: Horario no encontrado
+ */
+async function addAttendeesToSchedule(req, res) {
+  try {
+    const { scheduleId } = req.params;
+    const { quantity } = req.body || {};
+    
+    if (!quantity || quantity <= 0) {
+      return sendErrorResponse(res, { 
+        status: 400, 
+        message: 'quantity debe ser un número mayor a 0' 
+      });
+    }
+
+    const result = await activitiesService.addAttendeesToSchedule(scheduleId, quantity);
+    res.json(result);
+  } catch (e) {
+    console.error(e);
+    
+    if (e instanceof AppError && e.code === 'CAPACITY_EXCEEDED') {
+      return res.status(409).json({
+        message: e.message,
+        code: e.code,
+        details: e.details
+      });
+    }
+    
+    if (e instanceof AppError && e.status === 404) {
+      return sendErrorResponse(res, { status: 404, message: e.message });
+    }
+
+    sendErrorResponse(res, e, 500, 'Error al agregar asistentes');
+  }
+}
+
+/**
+ * @openapi
+ * /api/activities/schedules/availability:
+ *   get:
+ *     tags: [Activities]
+ *     summary: Consultar disponibilidad de horarios
+ *     description: Obtiene información de disponibilidad de horarios con filtros opcionales
+ *     parameters:
+ *       - in: query
+ *         name: activityId
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Filtrar por ID de actividad
+ *       - in: query
+ *         name: startDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Fecha de inicio del rango
+ *       - in: query
+ *         name: endDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Fecha de fin del rango
+ *     responses:
+ *       200:
+ *         description: Lista de horarios con disponibilidad
+ */
+async function getScheduleAvailability(req, res) {
+  try {
+    const { activityId, startDate, endDate } = req.query;
+    
+    const filters = {};
+    if (activityId) filters.activityId = activityId;
+    if (startDate) filters.startDate = startDate;
+    if (endDate) filters.endDate = endDate;
+
+    const availability = await activitiesService.getScheduleAvailability(filters);
+    res.json(availability);
+  } catch (e) {
+    console.error(e);
+    sendErrorResponse(res, e, 500, 'Error al consultar disponibilidad');
+  }
+}
+
+/**
+ * @openapi
+ * /api/activities/{activityId}/schedules/available:
+ *   get:
+ *     tags: [Activities]
+ *     summary: Obtener horarios disponibles por día
+ *     description: Obtiene los horarios disponibles (con espacios) para una actividad en una fecha específica
+ *     parameters:
+ *       - in: path
+ *         name: activityId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *       - in: query
+ *         name: date
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: date
+ *           example: '2024-03-15'
+ *     responses:
+ *       200:
+ *         description: Lista de horarios disponibles
+ */
+async function getAvailableSchedulesByDate(req, res) {
+  try {
+    const { activityId } = req.params;
+    const { date } = req.query;
+    
+    if (!date) {
+      return sendErrorResponse(res, { 
+        status: 400, 
+        message: 'date es requerido (formato YYYY-MM-DD)' 
+      });
+    }
+
+    // Validar formato de fecha
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(date)) {
+      return sendErrorResponse(res, { 
+        status: 400, 
+        message: 'Formato de fecha inválido. Use YYYY-MM-DD' 
+      });
+    }
+
+    const schedules = await activitiesService.getAvailableSchedulesByDate(activityId, date);
+    res.json(schedules);
+  } catch (e) {
+    console.error(e);
+    sendErrorResponse(res, e, 500, 'Error al obtener horarios disponibles');
+  }
+}
+
 module.exports = { 
   getByDate, 
   list, 
@@ -555,4 +824,9 @@ module.exports = {
   updateSchedule,
   toggleScheduleStatus,
   deleteSchedule,
+  // Capacidad y reservas
+  bulkCreateSchedules,
+  addAttendeesToSchedule,
+  getScheduleAvailability,
+  getAvailableSchedulesByDate,
 };

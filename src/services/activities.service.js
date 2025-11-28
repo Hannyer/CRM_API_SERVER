@@ -141,8 +141,8 @@ async function deleteActivity(activityId) {
 
 // ========== SERVICIOS PARA PLANEACIONES ==========
 
-async function createSchedule(activityId, { scheduledStart, scheduledEnd, status = true }) {
-  return activitiesRepo.createSchedule(activityId, { scheduledStart, scheduledEnd, status });
+async function createSchedule(activityId, { scheduledStart, scheduledEnd, capacity = 0, status = true }) {
+  return activitiesRepo.createSchedule(activityId, { scheduledStart, scheduledEnd, capacity, status });
 }
 
 async function getScheduleById(scheduleId) {
@@ -153,8 +153,8 @@ async function getSchedulesByActivityId(activityId) {
   return activitiesRepo.getSchedulesByActivityId(activityId);
 }
 
-async function updateSchedule(scheduleId, { scheduledStart, scheduledEnd, status }) {
-  return activitiesRepo.updateSchedule(scheduleId, { scheduledStart, scheduledEnd, status });
+async function updateSchedule(scheduleId, { scheduledStart, scheduledEnd, capacity, status }) {
+  return activitiesRepo.updateSchedule(scheduleId, { scheduledStart, scheduledEnd, capacity, status });
 }
 
 async function deleteSchedule(scheduleId) {
@@ -163,6 +163,66 @@ async function deleteSchedule(scheduleId) {
 
 async function toggleScheduleStatus(scheduleId, status) {
   return activitiesRepo.toggleScheduleStatus(scheduleId, status);
+}
+
+// ========== SERVICIOS PARA CAPACIDAD Y RESERVAS ==========
+
+/**
+ * Inserción masiva de horarios para una actividad
+ */
+async function bulkCreateSchedules(activityId, startDate, endDate, timeSlots, validateOverlaps = true) {
+  // Validar que la actividad existe
+  const activity = await activitiesRepo.getActivityById(activityId);
+  if (!activity) {
+    throw new AppError('Actividad no encontrada', 404, 'ACTIVITY_NOT_FOUND');
+  }
+
+  return activitiesRepo.bulkCreateSchedules(activityId, startDate, endDate, timeSlots, validateOverlaps);
+}
+
+/**
+ * Suma asistentes a un horario específico
+ */
+async function addAttendeesToSchedule(scheduleId, quantity) {
+  // Validar que el horario existe
+  const schedule = await activitiesRepo.getScheduleById(scheduleId);
+  if (!schedule) {
+    throw new AppError('Horario no encontrado', 404, 'SCHEDULE_NOT_FOUND');
+  }
+
+  try {
+    return await activitiesRepo.addAttendeesToSchedule(scheduleId, quantity);
+  } catch (error) {
+    // Convertir errores de capacidad en AppError
+    if (error.code === 'CAPACITY_EXCEEDED') {
+      throw new AppError(
+        error.message || 'No hay suficiente capacidad disponible',
+        409,
+        'CAPACITY_EXCEEDED',
+        {
+          currentBooked: error.currentBooked,
+          capacity: error.capacity,
+          available: error.available,
+          requested: error.requested
+        }
+      );
+    }
+    throw error;
+  }
+}
+
+/**
+ * Consulta disponibilidad de horarios
+ */
+async function getScheduleAvailability(filters = {}) {
+  return activitiesRepo.getScheduleAvailability(filters);
+}
+
+/**
+ * Obtiene horarios disponibles por día para una actividad
+ */
+async function getAvailableSchedulesByDate(activityId, date) {
+  return activitiesRepo.getAvailableSchedulesByDate(activityId, date);
 }
 
 module.exports = {
@@ -183,4 +243,9 @@ module.exports = {
   updateSchedule,
   deleteSchedule,
   toggleScheduleStatus,
+  // Capacidad y reservas
+  bulkCreateSchedules,
+  addAttendeesToSchedule,
+  getScheduleAvailability,
+  getAvailableSchedulesByDate,
 };
