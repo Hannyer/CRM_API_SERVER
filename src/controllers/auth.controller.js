@@ -1,7 +1,7 @@
 // src/controllers/auth.controller.js
 const userService = require('../services/users.service');
 const configService = require('../services/config.service');
-const { decrypt,encrypt } = require('../utils/crypto-compat');
+const { decrypt, encrypt } = require('../utils/crypto-compat');
 
 /**
  * @openapi
@@ -33,29 +33,29 @@ const { decrypt,encrypt } = require('../utils/crypto-compat');
  */
 async function login(req, res) {
   try {
-     const unauthorized = () =>
+    const unauthorized = () =>
       res.status(401).json({ message: 'Credenciales incorrectas. Por favor, verifica tu usuario y contraseña.' });
 
     const { username = '', password = '' } = req.body || {};
     const user = await userService.findByEmail(username);
- 
+
     if (!user) return unauthorized();
 
     let storedPlain;
     try {
-      
-      storedPlain = decrypt(user.Password);
-    } catch(e) {
-          console.log("Error:  "+e.message);
+
+      storedPlain = decrypt(user.password_hash);
+    } catch (e) {
+      console.log("Error:  " + e.message);
       return unauthorized();
     }
     console.log(storedPlain)
     console.log(password)
     if (storedPlain !== password) return unauthorized();
-    if (!user.Status) return unauthorized();
+    if (!user.status) return unauthorized();
 
     const rolClienteValue = await configService.getRolClienteValue();
-    const isExternal = rolClienteValue != null && String(user.ID_Role) === String(rolClienteValue);
+    const isExternal = rolClienteValue != null && String(user.role) === String(rolClienteValue);
 
     const token = 'fake.jwt.token';
     return res.json({ token, user: { ...user, isexternal: isExternal } });

@@ -3,109 +3,103 @@ const { pool } = require('../config/db.pg');
 
 async function getConfigList({
   opcion = 0,
-  pkConfig = 0,
-  description = '',
-  key01 = '',
-  key02 = '',
-  key03 = '',
-  key04 = '',
-  key05 = '',
-  key06 = '',
-  value = '',
+  pkConfig = null, // Renamed param logic internally, but keeping interface flexible
+  description = null,
+  key01 = null,
+  key02 = null,
+  key03 = null,
+  key04 = null,
+  key05 = null,
+  key06 = null,
+  value = null,
   page = 1,
   pageSize = 10,
-  search = '',
-  sort = 'PK_CONFIGURATION',
-  order = 'asc',
+  search = null,
+  sort = 'created_at',
+  order = 'DESC',
 }) {
   const sql = `
     SELECT
-      "PK_CONFIGURATION" AS "pk_configuration",
-      "ESTADO"           AS "estado",
-      "DESCRIPTION"      AS "description",
-      "OBSERVACION"      AS "observacion",
-      "KEY01"            AS "key01",
-      "KEY02"            AS "key02",
-      "KEY03"            AS "key03",
-      "KEY04"            AS "key04",
-      "KEY05"            AS "key05",
-      "KEY06"            AS "key06",
-      "VALUE"            AS "value",
-      "DisplayName"      AS "displayname",
-      "TotalCount"       AS "totalcount"
-    FROM dbo."PA_CON_TBL_MBR_CONFIGURACION"(
-      $1::smallint,   -- p_opcion
-      $2::bigint,     -- p_pk_config
-      $3::varchar,    -- p_description
-      $4::varchar,    -- p_key01
-      $5::varchar,    -- p_key02
-      $6::varchar,    -- p_key03
-      $7::varchar,    -- p_key04
-      $8::varchar,    -- p_key05
-      $9::varchar,    -- p_key06
-      $10::varchar,   -- p_value
-      $11::int,       -- p_page
-      $12::int,       -- p_pagesize
-      $13::varchar,   -- p_search
-      $14::varchar,   -- p_sort
-      $15::varchar    -- p_order
+      id               AS "pk_configuration",   -- Alias for compatibility if needed, or update usage
+      status           AS "estado",
+      description      AS "description",
+      observation      AS "observacion",
+      key01            AS "key01",
+      key02            AS "key02",
+      key03            AS "key03",
+      key04            AS "key04",
+      key05            AS "key05",
+      key06            AS "key06",
+      value            AS "value",
+      display_name     AS "displayname",
+      total_count      AS "totalcount"
+    FROM ops.get_configurations(
+      $1::int, 
+      $2::uuid, 
+      $3::varchar, 
+      $4::varchar, 
+      $5::varchar, 
+      $6::varchar, 
+      $7::varchar, 
+      $8::varchar, 
+      $9::varchar, 
+      $10::varchar, 
+      $11::int, 
+      $12::int, 
+      $13::varchar, 
+      $14::varchar, 
+      $15::varchar
     );
   `;
 
-  const params = [
+  // Ensure params are null if empty string to match SP logic (optional, but safer)
+  const p = [
     opcion,
-    pkConfig,
-    description,
-    key01,
-    key02,
-    key03,
-    key04,
-    key05,
-    key06,
-    value,
+    pkConfig || null,
+    description || null,
+    key01 || null,
+    key02 || null,
+    key03 || null,
+    key04 || null,
+    key05 || null,
+    key06 || null,
+    value || null,
     page,
     pageSize,
-    search ?? '',
+    search || null,
     sort,
     order,
   ];
 
-  const { rows } = await pool.query(sql, params);
+  const { rows } = await pool.query(sql, p);
   return rows;
 }
 
+// Reuse getConfigList for the simplified list function or implement direct query
 async function listConfigurations({ page = 1, limit = 10 } = {}) {
-  const offset = (page - 1) * limit;
-  
-  // Obtener el total de registros
-  const countResult = await pool.query(
-    `SELECT COUNT(*) as total FROM dbo."CONFIGURATION"`
-  );
-  const total = parseInt(countResult.rows[0].total, 10);
-  
-  // Obtener los registros paginados
-  const { rows } = await pool.query(
-    `SELECT 
-      "PK_CONFIGURATION" as "pkConfiguration",
-      "ESTADO" as "estado",
-      "DESCRIPTION" as "description",
-      "OBSERVACION" as "observacion",
-      "KEY01" as "key01",
-      "KEY02" as "key02",
-      "KEY03" as "key03",
-      "KEY04" as "key04",
-      "KEY05" as "key05",
-      "KEY06" as "key06",
-      "VALUE" as "value",
-      "DisplayName" as "displayName"
-     FROM dbo."CONFIGURATION"
-     ORDER BY "PK_CONFIGURATION" DESC
-     LIMIT $1 OFFSET $2`,
-    [limit, offset]
-  );
-  
+  // Using the new function directly
+  const rows = await getConfigList({ page, pageSize: limit, sort: 'created_at', order: 'DESC' });
+
+  const total = rows.length > 0 ? parseInt(rows[0].totalcount, 10) : 0;
+
+  // Map to preserve legacy camelCase output matching original listConfigurations
+  const items = rows.map(r => ({
+    pkConfiguration: r.pk_configuration,
+    estado: r.estado,
+    description: r.description,
+    observacion: r.observacion,
+    key01: r.key01,
+    key02: r.key02,
+    key03: r.key03,
+    key04: r.key04,
+    key05: r.key05,
+    key06: r.key06,
+    value: r.value,
+    displayName: r.displayname
+  }));
+
   return {
-    items: rows,
+    items,
     total,
     page,
     limit,
@@ -113,259 +107,234 @@ async function listConfigurations({ page = 1, limit = 10 } = {}) {
   };
 }
 
-async function createConfiguration({ 
-  estado = 1, 
-  description = null, 
-  observacion = null, 
-  key01 = null, 
-  key02 = null, 
-  key03 = null, 
-  key04 = null, 
-  key05 = null, 
-  key06 = null, 
-  value = null, 
-  displayName = null 
+async function createConfiguration({
+  estado = 1, // 1=true, 0=false
+  description = null,
+  observacion = null,
+  key01 = null,
+  key02 = null,
+  key03 = null,
+  key04 = null,
+  key05 = null,
+  key06 = null,
+  value = null,
+  displayName = null
 }) {
   const sql = `
-    INSERT INTO dbo."CONFIGURATION" 
-      ("ESTADO", "DESCRIPTION", "OBSERVACION", "KEY01", "KEY02", "KEY03", "KEY04", "KEY05", "KEY06", "VALUE", "DisplayName")
+    INSERT INTO ops.configuration 
+      (status, description, observation, key01, key02, key03, key04, key05, key06, value, display_name)
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
     RETURNING 
-      "PK_CONFIGURATION" as "pkConfiguration",
-      "ESTADO" as "estado",
-      "DESCRIPTION" as "description",
-      "OBSERVACION" as "observacion",
-      "KEY01" as "key01",
-      "KEY02" as "key02",
-      "KEY03" as "key03",
-      "KEY04" as "key04",
-      "KEY05" as "key05",
-      "KEY06" as "key06",
-      "VALUE" as "value",
-      "DisplayName" as "displayName";
+      id as "pkConfiguration",
+      status as "estado",
+      description as "description",
+      observation as "observacion",
+      key01 as "key01",
+      key02 as "key02",
+      key03 as "key03",
+      key04 as "key04",
+      key05 as "key05",
+      key06 as "key06",
+      value as "value",
+      display_name as "displayName";
   `;
-  const params = [estado, description, observacion, key01, key02, key03, key04, key05, key06, value, displayName];
+  const statusBool = (estado === 1 || estado === true);
+  const params = [statusBool, description, observacion, key01, key02, key03, key04, key05, key06, value, displayName];
   const { rows } = await pool.query(sql, params);
   return rows[0];
 }
 
-async function getConfigurationById(pkConfiguration) {
+async function getConfigurationById(id) {
   const { rows } = await pool.query(
     `
     SELECT 
-      "PK_CONFIGURATION" as "pkConfiguration",
-      "ESTADO" as "estado",
-      "DESCRIPTION" as "description",
-      "OBSERVACION" as "observacion",
-      "KEY01" as "key01",
-      "KEY02" as "key02",
-      "KEY03" as "key03",
-      "KEY04" as "key04",
-      "KEY05" as "key05",
-      "KEY06" as "key06",
-      "VALUE" as "value",
-      "DisplayName" as "displayName"
-    FROM dbo."CONFIGURATION"
-    WHERE "PK_CONFIGURATION" = $1
+      id as "pkConfiguration",
+      status as "estado",
+      description as "description",
+      observation as "observacion",
+      key01 as "key01",
+      key02 as "key02",
+      key03 as "key03",
+      key04 as "key04",
+      key05 as "key05",
+      key06 as "key06",
+      value as "value",
+      display_name as "displayName"
+    FROM ops.configuration
+    WHERE id = $1
     `,
-    [pkConfiguration]
+    [id]
   );
 
   return rows[0] || null;
 }
 
-async function updateConfiguration(pkConfiguration, { 
-  estado, 
-  description, 
-  observacion, 
-  key01, 
-  key02, 
-  key03, 
-  key04, 
-  key05, 
-  key06, 
-  value, 
-  displayName 
+async function updateConfiguration(id, {
+  estado,
+  description,
+  observacion,
+  key01,
+  key02,
+  key03,
+  key04,
+  key05,
+  key06,
+  value,
+  displayName
 }) {
   const updates = [];
   const params = [];
   let paramIndex = 1;
 
   if (estado !== undefined) {
-    updates.push(`"ESTADO" = $${paramIndex++}`);
-    params.push(estado);
+    updates.push(`status = $${paramIndex++}`);
+    params.push(estado === 1 || estado === true);
   }
   if (description !== undefined) {
-    updates.push(`"DESCRIPTION" = $${paramIndex++}`);
+    updates.push(`description = $${paramIndex++}`);
     params.push(description);
   }
   if (observacion !== undefined) {
-    updates.push(`"OBSERVACION" = $${paramIndex++}`);
+    updates.push(`observation = $${paramIndex++}`);
     params.push(observacion);
   }
   if (key01 !== undefined) {
-    updates.push(`"KEY01" = $${paramIndex++}`);
+    updates.push(`key01 = $${paramIndex++}`);
     params.push(key01);
   }
   if (key02 !== undefined) {
-    updates.push(`"KEY02" = $${paramIndex++}`);
+    updates.push(`key02 = $${paramIndex++}`);
     params.push(key02);
   }
   if (key03 !== undefined) {
-    updates.push(`"KEY03" = $${paramIndex++}`);
+    updates.push(`key03 = $${paramIndex++}`);
     params.push(key03);
   }
   if (key04 !== undefined) {
-    updates.push(`"KEY04" = $${paramIndex++}`);
+    updates.push(`key04 = $${paramIndex++}`);
     params.push(key04);
   }
   if (key05 !== undefined) {
-    updates.push(`"KEY05" = $${paramIndex++}`);
+    updates.push(`key05 = $${paramIndex++}`);
     params.push(key05);
   }
   if (key06 !== undefined) {
-    updates.push(`"KEY06" = $${paramIndex++}`);
+    updates.push(`key06 = $${paramIndex++}`);
     params.push(key06);
   }
   if (value !== undefined) {
-    updates.push(`"VALUE" = $${paramIndex++}`);
+    updates.push(`value = $${paramIndex++}`);
     params.push(value);
   }
   if (displayName !== undefined) {
-    updates.push(`"DisplayName" = $${paramIndex++}`);
+    updates.push(`display_name = $${paramIndex++}`);
     params.push(displayName);
   }
 
-  if (updates.length === 0) {
-    // Si no hay actualizaciones, devolvemos la configuración actual
-    return getConfigurationById(pkConfiguration);
+  updates.push(`updated_at = CURRENT_TIMESTAMP`);
+
+  if (updates.length === 1) { // only updated_at
+    return getConfigurationById(id);
   }
 
-  params.push(pkConfiguration);
+  params.push(id);
   const sql = `
-    UPDATE dbo."CONFIGURATION"
+    UPDATE ops.configuration
     SET ${updates.join(', ')}
-    WHERE "PK_CONFIGURATION" = $${paramIndex}
+    WHERE id = $${paramIndex}
     RETURNING 
-      "PK_CONFIGURATION" as "pkConfiguration",
-      "ESTADO" as "estado",
-      "DESCRIPTION" as "description",
-      "OBSERVACION" as "observacion",
-      "KEY01" as "key01",
-      "KEY02" as "key02",
-      "KEY03" as "key03",
-      "KEY04" as "key04",
-      "KEY05" as "key05",
-      "KEY06" as "key06",
-      "VALUE" as "value",
-      "DisplayName" as "displayName";
+      id as "pkConfiguration",
+      status as "estado",
+      description as "description",
+      observation as "observacion",
+      key01 as "key01",
+      key02 as "key02",
+      key03 as "key03",
+      key04 as "key04",
+      key05 as "key05",
+      key06 as "key06",
+      value as "value",
+      display_name as "displayName";
   `;
 
   const { rows } = await pool.query(sql, params);
-  if (rows.length === 0) {
-    return null;
-  }
-
-  return rows[0];
+  return rows[0] || null;
 }
 
-async function deleteConfiguration(pkConfiguration) {
-  // Soft delete: cambiamos el estado a 0 (o el valor que represente eliminado)
+async function deleteConfiguration(id) {
+  // Soft delete
   const { rows } = await pool.query(
     `
-    UPDATE dbo."CONFIGURATION"
-    SET "ESTADO" = 0
-    WHERE "PK_CONFIGURATION" = $1
+    UPDATE ops.configuration
+    SET status = false, updated_at = CURRENT_TIMESTAMP
+    WHERE id = $1
     RETURNING 
-      "PK_CONFIGURATION" as "pkConfiguration",
-      "ESTADO" as "estado",
-      "DESCRIPTION" as "description",
-      "OBSERVACION" as "observacion",
-      "KEY01" as "key01",
-      "KEY02" as "key02",
-      "KEY03" as "key03",
-      "KEY04" as "key04",
-      "KEY05" as "key05",
-      "KEY06" as "key06",
-      "VALUE" as "value",
-      "DisplayName" as "displayName";
+      id as "pkConfiguration",
+      status as "estado",
+      description as "description",
+      observation as "observacion",
+      key01 as "key01",
+      key02 as "key02",
+      key03 as "key03",
+      key04 as "key04",
+      key05 as "key05",
+      key06 as "key06",
+      value as "value",
+      display_name as "displayName";
     `,
-    [pkConfiguration]
+    [id]
   );
 
   return rows[0] || null;
 }
 
-async function listConfigurationsByKeys({ 
-  key01 = null, 
-  key02 = null, 
-  key03 = null, 
-  key04 = null, 
-  key05 = null, 
+async function listConfigurationsByKeys({
+  key01 = null,
+  key02 = null,
+  key03 = null,
+  key04 = null,
+  key05 = null,
   key06 = null
 } = {}) {
   const conditions = [];
   const params = [];
   let paramIndex = 1;
 
-  // Construir condiciones dinámicamente basadas en las llaves proporcionadas
-  if (key01 !== null && key01 !== undefined && key01 !== '') {
-    conditions.push(`"KEY01" = $${paramIndex++}`);
-    params.push(key01);
-  }
-  if (key02 !== null && key02 !== undefined && key02 !== '') {
-    conditions.push(`"KEY02" = $${paramIndex++}`);
-    params.push(key02);
-  }
-  if (key03 !== null && key03 !== undefined && key03 !== '') {
-    conditions.push(`"KEY03" = $${paramIndex++}`);
-    params.push(key03);
-  }
-  if (key04 !== null && key04 !== undefined && key04 !== '') {
-    conditions.push(`"KEY04" = $${paramIndex++}`);
-    params.push(key04);
-  }
-  if (key05 !== null && key05 !== undefined && key05 !== '') {
-    conditions.push(`"KEY05" = $${paramIndex++}`);
-    params.push(key05);
-  }
-  if (key06 !== null && key06 !== undefined && key06 !== '') {
-    conditions.push(`"KEY06" = $${paramIndex++}`);
-    params.push(key06);
-  }
+  if (key01) { conditions.push(`key01 = $${paramIndex++}`); params.push(key01); }
+  if (key02) { conditions.push(`key02 = $${paramIndex++}`); params.push(key02); }
+  if (key03) { conditions.push(`key03 = $${paramIndex++}`); params.push(key03); }
+  if (key04) { conditions.push(`key04 = $${paramIndex++}`); params.push(key04); }
+  if (key05) { conditions.push(`key05 = $${paramIndex++}`); params.push(key05); }
+  if (key06) { conditions.push(`key06 = $${paramIndex++}`); params.push(key06); }
 
-  // Si no hay condiciones, devolver lista vacía
-  if (conditions.length === 0) {
-    return [];
-  }
+  if (conditions.length === 0) return [];
 
   const whereClause = conditions.join(' AND ');
-  
-  // Obtener todos los registros sin paginación
+
   const { rows } = await pool.query(
     `SELECT 
-      "PK_CONFIGURATION" as "pkConfiguration",
-      "ESTADO" as "estado",
-      "DESCRIPTION" as "description",
-      "OBSERVACION" as "observacion",
-      "KEY01" as "key01",
-      "KEY02" as "key02",
-      "KEY03" as "key03",
-      "KEY04" as "key04",
-      "KEY05" as "key05",
-      "KEY06" as "key06",
-      "VALUE" as "value",
-      "DisplayName" as "displayName"
-     FROM dbo."CONFIGURATION"
+      id as "pkConfiguration",
+      status as "estado",
+      description as "description",
+      observation as "observacion",
+      key01 as "key01",
+      key02 as "key02",
+      key03 as "key03",
+      key04 as "key04",
+      key05 as "key05",
+      key06 as "key06",
+      value as "value",
+      display_name as "displayName"
+     FROM ops.configuration
      WHERE ${whereClause}
-     ORDER BY "PK_CONFIGURATION" DESC`,
+     ORDER BY created_at DESC`,
     params
   );
-  
+
   return rows;
 }
 
-module.exports = { 
+module.exports = {
   getConfigList,
   listConfigurations,
   listConfigurationsByKeys,

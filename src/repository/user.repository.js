@@ -1,13 +1,21 @@
 
 const { pool } = require('../config/db.pg');
 
-async function getUsers({ opcion = 0, id = 0, user = '', email = '', role = 0, documentId = '' }) {
+async function getUsers({ email = '' }) {
+  // Se usa consulta directa en lugar de SP
   const sql = `
-    SELECT * FROM dbo."PA_CON_MBR_TBL_USER"(
-      $1::int, $2::int, $3::varchar, $4::varchar, $5::int, $6::varchar
-    );
+    SELECT 
+      id,
+      email,
+      full_name,
+      password_hash,
+      role,
+      status,
+      created_at
+    FROM ops.app_user
+    WHERE email = $1
   `;
-  const params = [opcion, id, user, email, role, documentId];
+  const params = [email];
   const { rows } = await pool.query(sql, params);
   return rows;
 }
