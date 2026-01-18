@@ -37,6 +37,7 @@ async function login(req, res) {
       res.status(401).json({ message: 'Credenciales incorrectas. Por favor, verifica tu usuario y contraseña.' });
 
     const { username = '', password = '' } = req.body || {};
+    console.log(encrypt(password));
     const user = await userService.findByEmail(username);
 
     if (!user) return unauthorized();

@@ -210,6 +210,7 @@ CREATE INDEX IF NOT EXISTS idx_configuration_keys ON ops.configuration(key01, ke
 CREATE INDEX IF NOT EXISTS idx_configuration_status ON ops.configuration(status);
 
 -- Función de búsqueda y paginado para configuraciones
+-- Corregida: Referencias ambiguas en ORDER BY resueltas usando alias del CTE
 CREATE OR REPLACE FUNCTION ops.get_configurations(
     p_opcion INT DEFAULT 0, -- 0: Normal list, 1: Specific Logic if needed
     p_id UUID DEFAULT NULL,
@@ -250,8 +251,19 @@ BEGIN
     RETURN QUERY
     WITH FilteredData AS (
         SELECT 
-            c.id, c.key01, c.key02, c.key03, c.key04, c.key05, c.key06, 
-            c.value, c.description, c.observation, c.display_name, c.status,
+            c.id, 
+            c.key01, 
+            c.key02, 
+            c.key03, 
+            c.key04, 
+            c.key05, 
+            c.key06, 
+            c.value, 
+            c.description, 
+            c.observation, 
+            c.display_name, 
+            c.status,
+            c.created_at,
             COUNT(*) OVER() AS total_count
         FROM ops.configuration c
         WHERE 
@@ -270,21 +282,36 @@ BEGIN
                 c.value ILIKE '%' || p_search || '%'
             ))
     )
-    SELECT *
-    FROM FilteredData
+    SELECT 
+        fd.id, 
+        fd.key01, 
+        fd.key02, 
+        fd.key03, 
+        fd.key04, 
+        fd.key05, 
+        fd.key06, 
+        fd.value, 
+        fd.description, 
+        fd.observation, 
+        fd.display_name, 
+        fd.status,
+        fd.total_count
+    FROM FilteredData fd
     ORDER BY 
         CASE WHEN p_sort_dir = 'ASC' THEN
             CASE 
-                WHEN p_sort_col = 'key01' THEN key01 
-                WHEN p_sort_col = 'value' THEN value
-                ELSE CAST(created_at AS TEXT)
+                WHEN p_sort_col = 'key01' THEN fd.key01 
+                WHEN p_sort_col = 'value' THEN fd.value
+                WHEN p_sort_col = 'created_at' THEN CAST(fd.created_at AS TEXT)
+                ELSE CAST(fd.created_at AS TEXT)
             END
         END ASC,
         CASE WHEN p_sort_dir = 'DESC' THEN
             CASE 
-                WHEN p_sort_col = 'key01' THEN key01
-                WHEN p_sort_col = 'value' THEN value
-                ELSE CAST(created_at AS TEXT)
+                WHEN p_sort_col = 'key01' THEN fd.key01
+                WHEN p_sort_col = 'value' THEN fd.value
+                WHEN p_sort_col = 'created_at' THEN CAST(fd.created_at AS TEXT)
+                ELSE CAST(fd.created_at AS TEXT)
             END
         END DESC
     LIMIT p_page_size OFFSET v_offset;
