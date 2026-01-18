@@ -1,0 +1,243 @@
+{
+	"info": {
+		"_postman_id": "guides-api-collection",
+		"name": "Guías API - CRM",
+		"description": "Colección completa de endpoints para el mantenimiento de guías",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. CREAR Guía",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"fullName\": \"Juan Pérez\",\n    \"email\": \"juan.perez@example.com\",\n    \"phone\": \"+506 8888-8888\",\n    \"status\": true\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/guides",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"guides"
+					]
+				},
+				"description": "Crea un nuevo guía en el sistema"
+			},
+			"response": []
+		},
+		{
+			"name": "2. LISTAR Todos los Guías",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/guides?page=1&limit=10",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"guides"
+					],
+					"query": [
+						{
+							"key": "page",
+							"value": "1",
+							"description": "Número de página"
+						},
+						{
+							"key": "limit",
+							"value": "10",
+							"description": "Registros por página"
+						}
+					]
+				},
+				"description": "Obtiene una lista paginada de todos los guías"
+			},
+			"response": []
+		},
+		{
+			"name": "3. OBTENER Guía por ID",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/guides/:id",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"guides",
+						":id"
+					],
+					"variable": [
+						{
+							"key": "id",
+							"value": "123e4567-e89b-12d3-a456-426614174000",
+							"description": "UUID del guía"
+						}
+					]
+				},
+				"description": "Obtiene la información completa de un guía incluyendo sus idiomas"
+			},
+			"response": []
+		},
+		{
+			"name": "4. ACTUALIZAR Guía",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"fullName\": \"Juan Pérez Actualizado\",\n    \"email\": \"nuevo.email@example.com\",\n    \"phone\": \"+506 9999-9999\",\n    \"status\": true\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/guides/:id",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"guides",
+						":id"
+					],
+					"variable": [
+						{
+							"key": "id",
+							"value": "123e4567-e89b-12d3-a456-426614174000",
+							"description": "UUID del guía"
+						}
+					]
+				},
+				"description": "Actualiza la información de un guía existente"
+			},
+			"response": []
+		},
+		{
+			"name": "5. ELIMINAR Guía",
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/guides/:id",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"guides",
+						":id"
+					],
+					"variable": [
+						{
+							"key": "id",
+							"value": "123e4567-e89b-12d3-a456-426614174000",
+							"description": "UUID del guía"
+						}
+					]
+				},
+				"description": "Realiza un soft delete del guía (cambia status a false)"
+			},
+			"response": []
+		},
+		{
+			"name": "6. CONSULTAR Disponibilidad",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/guides/availability?date=2024-12-25&activityTypeId=&languageIds=",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"guides",
+						"availability"
+					],
+					"query": [
+						{
+							"key": "date",
+							"value": "2024-12-25",
+							"description": "Fecha en formato YYYY-MM-DD (requerido)"
+						},
+						{
+							"key": "activityTypeId",
+							"value": "",
+							"description": "ID del tipo de actividad (opcional)",
+							"disabled": true
+						},
+						{
+							"key": "languageIds",
+							"value": "",
+							"description": "IDs de idiomas separados por coma (opcional)",
+							"disabled": true
+						}
+					]
+				},
+				"description": "Obtiene la lista de guías disponibles para una fecha específica"
+			},
+			"response": []
+		},
+		{
+			"name": "7. ASIGNAR Idiomas a Guía",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"languageIds\": [\n        \"lang-uuid-1\",\n        \"lang-uuid-2\"\n    ]\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/guides/:id/languages",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"guides",
+						":id",
+						"languages"
+					],
+					"variable": [
+						{
+							"key": "id",
+							"value": "123e4567-e89b-12d3-a456-426614174000",
+							"description": "UUID del guía"
+						}
+					]
+				},
+				"description": "Asigna o actualiza los idiomas que habla un guía"
+			},
+			"response": []
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:3000",
+			"type": "string"
+		}
+	]
+}
+

@@ -41,6 +41,40 @@ module.exports = {
           id: { type: 'string', format: 'uuid', example: '123e4567-e89b-12d3-a456-426614174000' },
           code: { type: 'string', example: 'es' },
           name: { type: 'string', example: 'Español' },
+          status: { type: 'boolean', example: true },
+          created_at: { type: 'string', format: 'date-time', example: '2024-01-01T00:00:00Z' },
+          updated_at: { type: 'string', format: 'date-time', example: '2024-01-01T00:00:00Z' },
+        },
+      },
+
+      LanguageListItem: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid', example: '123e4567-e89b-12d3-a456-426614174000' },
+          code: { type: 'string', example: 'es' },
+          name: { type: 'string', example: 'Español' },
+          status: { type: 'boolean', example: true },
+          created_at: { type: 'string', format: 'date-time', example: '2024-01-01T00:00:00Z' },
+          updated_at: { type: 'string', format: 'date-time', example: '2024-01-01T00:00:00Z' },
+        },
+      },
+
+      LanguageCreateRequest: {
+        type: 'object',
+        required: ['code', 'name'],
+        properties: {
+          code: { type: 'string', example: 'es' },
+          name: { type: 'string', example: 'Español' },
+          status: { type: 'boolean', example: true },
+        },
+      },
+
+      LanguageUpdateRequest: {
+        type: 'object',
+        properties: {
+          code: { type: 'string', example: 'es' },
+          name: { type: 'string', example: 'Español' },
+          status: { type: 'boolean', example: true },
         },
       },
 
@@ -52,8 +86,6 @@ module.exports = {
           email: { type: 'string', format: 'email', example: 'juan.perez@example.com' },
           phone: { type: 'string', nullable: true, example: '+506 8888-8888' },
           status: { type: 'boolean', example: true },
-          is_leader: { type: 'boolean', example: false },
-          max_party_size: { type: 'integer', nullable: true, example: 20 },
           languages: {
             type: 'array',
             items: { $ref: '#/components/schemas/Language' },
@@ -73,8 +105,6 @@ module.exports = {
           email: { type: 'string', format: 'email', example: 'juan.perez@example.com' },
           phone: { type: 'string', nullable: true, example: '+506 8888-8888' },
           status: { type: 'boolean', example: true },
-          is_leader: { type: 'boolean', example: false },
-          max_party_size: { type: 'integer', nullable: true, example: 20 },
         },
       },
 
@@ -85,9 +115,13 @@ module.exports = {
           fullName: { type: 'string', example: 'Juan Pérez' },
           email: { type: 'string', format: 'email', example: 'juan.perez@example.com' },
           phone: { type: 'string', nullable: true, example: '+506 8888-8888' },
-          isLeader: { type: 'boolean', example: false },
           status: { type: 'boolean', example: true },
-          maxPartySize: { type: 'integer', nullable: true, example: 20 },
+          languageIds: {
+            type: 'array',
+            items: { type: 'string', format: 'uuid' },
+            description: 'IDs de idiomas que habla el guía (opcional)',
+            example: ['123e4567-e89b-12d3-a456-426614174000', '223e4567-e89b-12d3-a456-426614174001'],
+          },
         },
       },
 
@@ -97,9 +131,13 @@ module.exports = {
           fullName: { type: 'string', example: 'Juan Pérez' },
           email: { type: 'string', format: 'email', example: 'juan.perez@example.com' },
           phone: { type: 'string', nullable: true, example: '+506 8888-8888' },
-          isLeader: { type: 'boolean', example: false },
           status: { type: 'boolean', example: true },
-          maxPartySize: { type: 'integer', nullable: true, example: 20 },
+          languageIds: {
+            type: 'array',
+            items: { type: 'string', format: 'uuid' },
+            description: 'IDs de idiomas que habla el guía (opcional). Si se proporciona, reemplaza todos los idiomas existentes.',
+            example: ['123e4567-e89b-12d3-a456-426614174000', '223e4567-e89b-12d3-a456-426614174001'],
+          },
         },
       },
 
@@ -121,7 +159,6 @@ module.exports = {
           id: { type: 'string', format: 'uuid' },
           name: { type: 'string' },
           email: { type: 'string' },
-          is_leader: { type: 'boolean' },
           is_available: { type: 'boolean' },
           languages: {
             type: 'array',

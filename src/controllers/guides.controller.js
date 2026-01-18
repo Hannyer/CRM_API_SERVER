@@ -237,6 +237,12 @@ async function getById(req, res) {
  *         application/json:
  *           schema:
  *             $ref: '#/components/schemas/GuideCreateRequest'
+ *           example:
+ *             fullName: "Juan Pérez"
+ *             email: "juan.perez@example.com"
+ *             phone: "+506 8888-8888"
+ *             status: true
+ *             languageIds: ["lang-uuid-1", "lang-uuid-2"]
  *     responses:
  *       201:
  *         description: Guía creado exitosamente
@@ -265,12 +271,17 @@ async function getById(req, res) {
  */
 async function create(req, res) {
   try {
-    const { fullName, email, phone = null, isLeader = false, status = true, maxPartySize = null } = req.body || {};
+    const { fullName, email, phone = null, status = true, languageIds = [] } = req.body || {};
     if (!fullName || !email) {
       return sendErrorResponse(res, { status: 400, message: 'fullName y email son requeridos' });
     }
 
-    const guide = await guidesService.createGuide({ fullName, email, phone, isLeader, status, maxPartySize });
+    // Validar que languageIds sea un array si se proporciona
+    if (languageIds !== undefined && !Array.isArray(languageIds)) {
+      return sendErrorResponse(res, { status: 400, message: 'languageIds debe ser un arreglo de UUID' });
+    }
+
+    const guide = await guidesService.createGuide({ fullName, email, phone, status, languageIds });
     res.status(201).json(guide);
   } catch (e) {
     console.error(e);
@@ -332,15 +343,19 @@ async function create(req, res) {
 async function update(req, res) {
   try {
     const { id } = req.params;
-    const { fullName, email, phone, isLeader, status, maxPartySize } = req.body || {};
+    const { fullName, email, phone, status, languageIds } = req.body || {};
+    
+    // Validar que languageIds sea un array si se proporciona
+    if (languageIds !== undefined && !Array.isArray(languageIds)) {
+      return sendErrorResponse(res, { status: 400, message: 'languageIds debe ser un arreglo de UUID' });
+    }
     
     const guide = await guidesService.updateGuide(id, {
       fullName,
       email,
       phone,
-      isLeader,
       status,
-      maxPartySize
+      languageIds
     });
     
     if (!guide) {

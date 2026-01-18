@@ -1,0 +1,167 @@
+{
+	"info": {
+		"_postman_id": "languages-api-collection",
+		"name": "Idiomas API - CRM",
+		"description": "Colección completa de endpoints para el mantenimiento de idiomas",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. CREAR Idioma",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"code\": \"es\",\n    \"name\": \"Español\",\n    \"status\": true\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/languages",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"languages"
+					]
+				},
+				"description": "Crea un nuevo idioma en el sistema"
+			},
+			"response": []
+		},
+		{
+			"name": "2. LISTAR Todos los Idiomas",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/languages?page=1&limit=10",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"languages"
+					],
+					"query": [
+						{
+							"key": "page",
+							"value": "1",
+							"description": "Número de página"
+						},
+						{
+							"key": "limit",
+							"value": "10",
+							"description": "Registros por página"
+						}
+					]
+				},
+				"description": "Obtiene una lista paginada de todos los idiomas"
+			},
+			"response": []
+		},
+		{
+			"name": "3. OBTENER Idioma por ID",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/languages/:id",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"languages",
+						":id"
+					],
+					"variable": [
+						{
+							"key": "id",
+							"value": "123e4567-e89b-12d3-a456-426614174000",
+							"description": "UUID del idioma"
+						}
+					]
+				},
+				"description": "Obtiene la información completa de un idioma"
+			},
+			"response": []
+		},
+		{
+			"name": "4. ACTUALIZAR Idioma",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"code\": \"es-MX\",\n    \"name\": \"Español de México\",\n    \"status\": true\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/api/languages/:id",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"languages",
+						":id"
+					],
+					"variable": [
+						{
+							"key": "id",
+							"value": "123e4567-e89b-12d3-a456-426614174000",
+							"description": "UUID del idioma"
+						}
+					]
+				},
+				"description": "Actualiza la información de un idioma existente"
+			},
+			"response": []
+		},
+		{
+			"name": "5. ELIMINAR Idioma",
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/api/languages/:id",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"api",
+						"languages",
+						":id"
+					],
+					"variable": [
+						{
+							"key": "id",
+							"value": "123e4567-e89b-12d3-a456-426614174000",
+							"description": "UUID del idioma"
+						}
+					]
+				},
+				"description": "Realiza un soft delete del idioma (cambia status a false)"
+			},
+			"response": []
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:3000",
+			"type": "string"
+		}
+	]
+}
+

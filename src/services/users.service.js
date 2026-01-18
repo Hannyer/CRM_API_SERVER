@@ -1,11 +1,22 @@
 ﻿// src/services/user.service.js
-const { getUsers } = require('../repository/user.repository');
+const { getUsers, getUserByEmail } = require('../repository/user.repository');
 
+/**
+ * Busca un usuario por email (optimizado para login)
+ * Retorna un solo objeto o null si no existe
+ */
 async function findByEmail(email) {
-  const list = await getUsers({ opcion: 0, email });
-  // El C# desencripta antes de comparar; aquí devolvemos tal cual y
-  // dejamos el “desencriptar” en el controller (para no acoplar).
-  return list?.[0] || null;
+  if (!email) return null;
+  // Usamos getUserByEmail que está optimizado para login (retorna objeto o null)
+  // El password_hash se mantiene encriptado y se desencripta en el controller
+  return await getUserByEmail(email);
 }
 
-module.exports = { findByEmail };
+/**
+ * Obtiene todos los usuarios (para listado)
+ */
+async function findAll() {
+  return await getUsers();
+}
+
+module.exports = { findByEmail, findAll };
