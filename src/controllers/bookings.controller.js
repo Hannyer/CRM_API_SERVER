@@ -45,6 +45,21 @@ const { sendErrorResponse } = require('../utils/errorHandler');
  *                     type: string
  *                   partySize:
  *                     type: integer
+ *                   adultPrice:
+ *                     type: number
+ *                     format: decimal
+ *                     example: 50.00
+ *                     description: Precio para adultos
+ *                   childPrice:
+ *                     type: number
+ *                     format: decimal
+ *                     example: 25.00
+ *                     description: Precio para niños
+ *                   seniorPrice:
+ *                     type: number
+ *                     format: decimal
+ *                     example: 40.00
+ *                     description: Precio para adultos mayores
  *                   bookedPeople:
  *                     type: integer
  *       404:

@@ -16,6 +16,9 @@ async function getAvailableSchedulesByActivityId(activityId) {
       s.status,
       a.title as "activityTitle",
       a.party_size as "partySize",
+      a.adult_price as "adultPrice",
+      a.child_price as "childPrice",
+      a.senior_price as "seniorPrice",
       COALESCE(
         (
           SELECT SUM(b.number_of_people)
