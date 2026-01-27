@@ -9,7 +9,6 @@ async function listActivityTypes() {
     `
     SELECT 
       id,
-      code,
       name,
       description
     FROM ops.activity_type
@@ -28,7 +27,6 @@ async function getActivityTypeById(activityTypeId) {
     `
     SELECT 
       id,
-      code,
       name,
       description
     FROM ops.activity_type

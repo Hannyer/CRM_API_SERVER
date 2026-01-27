@@ -371,17 +371,31 @@ async function getSchedulesByActivityId(activityId) {
   const { rows } = await pool.query(
     `
     SELECT 
-      id,
-      activity_id as "activityId",
-      scheduled_start as "scheduledStart",
-      scheduled_end as "scheduledEnd",
-      capacity,
-      booked_count as "bookedCount",
-      (capacity - booked_count) as "availableSpots",
-      status
-    FROM ops.activity_schedule
-    WHERE activity_id = $1::uuid
-    ORDER BY scheduled_start ASC
+    s.id,
+      s.activity_id as "activityId",
+      s.scheduled_start as "scheduledStart",
+      s.scheduled_end as "scheduledEnd",
+      a.party_size as "capacity",
+
+    COALESCE(b.total_booked, 0) AS "bookedCount",
+
+    (a.party_size - COALESCE(b.total_booked, 0)) AS "availableSpots",
+
+    s.status
+FROM ops.activity_schedule s
+INNER JOIN ops.activity a 
+    ON a.id = s.activity_id
+LEFT JOIN (
+    SELECT 
+        activity_schedule_id,
+        SUM(number_of_people) AS total_booked
+    FROM ops.booking
+    where status != 'cancelled'
+    GROUP BY activity_schedule_id
+) b ON b.activity_schedule_id = s.id
+
+WHERE s.activity_id = $1::uuid
+ORDER BY s.scheduled_start ASC;
     `,
     [activityId]
   );
@@ -499,9 +513,6 @@ async function bulkCreateSchedules(activityId, startDate, endDate, timeSlots, va
   for (const slot of timeSlots) {
     if (!slot.startTime || !slot.endTime) {
       throw new Error('Cada timeSlot debe tener startTime y endTime');
-    }
-    if (slot.capacity === undefined || slot.capacity < 0) {
-      throw new Error('Cada timeSlot debe tener capacity >= 0');
     }
   }
 
