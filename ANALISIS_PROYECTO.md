@@ -37,7 +37,7 @@ El proyecto utiliza PostgreSQL con un esquema llamado `ops` que contiene todas l
 #### 2. **Actividades y Planificación**
 
 - **`activity`**: Actividades turísticas
-  - `id` (UUID), `activity_type_id`, `title`, `party_size`, `status`, `created_at`, `updated_at`
+  - `id` (UUID), `activity_type_id`, `title`, `party_size`, `adult_price`, `child_price`, `senior_price`, `status`, `created_at`, `updated_at`
 
 - **`activity_schedule`**: Horarios programados de actividades (con capacidad y reservas)
   - `id` (UUID), `activity_id`, `scheduled_start`, `scheduled_end`, `capacity`, `booked_count`, `status`, `created_at`, `updated_at`

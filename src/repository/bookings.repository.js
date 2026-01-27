@@ -87,6 +87,9 @@ async function createBooking({
   companyId = null,
   transport = false,
   numberOfPeople,
+  adultCount = 0,
+  childCount = 0,
+  seniorCount = 0,
   passengerCount = null,
   commissionPercentage,
   customerName,
@@ -101,6 +104,9 @@ async function createBooking({
       company_id, 
       transport, 
       number_of_people,
+      adult_count,
+      child_count,
+      senior_count,
       passenger_count,
       commission_percentage,
       customer_name,
@@ -109,13 +115,16 @@ async function createBooking({
       status,
       created_by
     )
-    VALUES ($1::uuid, $2::uuid, $3::bool, $4::int, $5::int, $6::numeric, $7, $8, $9, $10, $11::uuid)
+    VALUES ($1::uuid, $2::uuid, $3::bool, $4::int, $5::int, $6::int, $7::int, $8::int, $9::numeric, $10, $11, $12, $13, $14::uuid)
     RETURNING 
       id,
       activity_schedule_id as "activityScheduleId",
       company_id as "companyId",
       transport,
       number_of_people as "numberOfPeople",
+      adult_count as "adultCount",
+      child_count as "childCount",
+      senior_count as "seniorCount",
       passenger_count as "passengerCount",
       commission_percentage as "commissionPercentage",
       customer_name as "customerName",
@@ -131,6 +140,9 @@ async function createBooking({
     companyId,
     transport,
     numberOfPeople,
+    adultCount,
+    childCount,
+    seniorCount,
     passengerCount,
     commissionPercentage,
     customerName,
@@ -180,6 +192,9 @@ async function listBookings({ page = 1, limit = 10, status = null, activitySched
       b.company_id as "companyId",
       b.transport,
       b.number_of_people as "numberOfPeople",
+      b.adult_count as "adultCount",
+      b.child_count as "childCount",
+      b.senior_count as "seniorCount",
       b.passenger_count as "passengerCount",
       b.commission_percentage as "commissionPercentage",
       b.customer_name as "customerName",
@@ -225,6 +240,9 @@ async function getBookingById(bookingId) {
       b.company_id as "companyId",
       b.transport,
       b.number_of_people as "numberOfPeople",
+      b.adult_count as "adultCount",
+      b.child_count as "childCount",
+      b.senior_count as "seniorCount",
       b.passenger_count as "passengerCount",
       b.commission_percentage as "commissionPercentage",
       b.customer_name as "customerName",
@@ -261,6 +279,9 @@ async function updateBooking(bookingId, {
   companyId,
   transport,
   numberOfPeople,
+  adultCount,
+  childCount,
+  seniorCount,
   passengerCount,
   commissionPercentage,
   customerName,
@@ -287,6 +308,18 @@ async function updateBooking(bookingId, {
   if (numberOfPeople !== undefined) {
     updates.push(`number_of_people = $${paramIndex++}::int`);
     params.push(numberOfPeople);
+  }
+  if (adultCount !== undefined) {
+    updates.push(`adult_count = $${paramIndex++}::int`);
+    params.push(adultCount);
+  }
+  if (childCount !== undefined) {
+    updates.push(`child_count = $${paramIndex++}::int`);
+    params.push(childCount);
+  }
+  if (seniorCount !== undefined) {
+    updates.push(`senior_count = $${paramIndex++}::int`);
+    params.push(seniorCount);
   }
   if (passengerCount !== undefined) {
     updates.push(`passenger_count = $${paramIndex++}::int`);
@@ -331,6 +364,9 @@ async function updateBooking(bookingId, {
       company_id as "companyId",
       transport,
       number_of_people as "numberOfPeople",
+      adult_count as "adultCount",
+      child_count as "childCount",
+      senior_count as "seniorCount",
       passenger_count as "passengerCount",
       commission_percentage as "commissionPercentage",
       customer_name as "customerName",

@@ -25,6 +25,9 @@ async function createBooking(payload) {
     companyId = null,
     transport = false,
     numberOfPeople,
+    adultCount = 0,
+    childCount = 0,
+    seniorCount = 0,
     passengerCount = null,
     commissionPercentage = null, // Si es null, se usa el de la compañía
     customerName,
@@ -37,6 +40,20 @@ async function createBooking(payload) {
   // Validar que se proporcione la cantidad de personas
   if (!numberOfPeople || numberOfPeople <= 0) {
     throw new AppError('numberOfPeople debe ser mayor a 0', 400);
+  }
+
+  // Validar que los conteos no sean negativos
+  if (adultCount < 0 || childCount < 0 || seniorCount < 0) {
+    throw new AppError('adultCount, childCount y seniorCount no pueden ser negativos', 400);
+  }
+
+  // Validar que la suma de adultCount + childCount + seniorCount sea igual a numberOfPeople
+  const totalCount = adultCount + childCount + seniorCount;
+  if (totalCount !== numberOfPeople) {
+    throw new AppError(
+      `La suma de adultCount (${adultCount}) + childCount (${childCount}) + seniorCount (${seniorCount}) debe ser igual a numberOfPeople (${numberOfPeople})`,
+      400
+    );
   }
 
   // Validar disponibilidad
@@ -93,6 +110,9 @@ async function createBooking(payload) {
     companyId,
     transport,
     numberOfPeople,
+    adultCount,
+    childCount,
+    seniorCount,
     passengerCount,
     commissionPercentage: finalCommissionPercentage,
     customerName,
@@ -128,6 +148,9 @@ async function updateBooking(bookingId, payload) {
     companyId,
     transport,
     numberOfPeople,
+    adultCount,
+    childCount,
+    seniorCount,
     passengerCount,
     commissionPercentage,
     customerName,
@@ -135,6 +158,38 @@ async function updateBooking(bookingId, payload) {
     customerPhone,
     status
   } = payload;
+
+  // Validar que los conteos no sean negativos si se proporcionan
+  if (adultCount !== undefined && adultCount < 0) {
+    throw new AppError('adultCount no puede ser negativo', 400);
+  }
+  if (childCount !== undefined && childCount < 0) {
+    throw new AppError('childCount no puede ser negativo', 400);
+  }
+  if (seniorCount !== undefined && seniorCount < 0) {
+    throw new AppError('seniorCount no puede ser negativo', 400);
+  }
+
+  // Si se actualizan los conteos o numberOfPeople, validar que coincidan
+  if (adultCount !== undefined || childCount !== undefined || seniorCount !== undefined || numberOfPeople !== undefined) {
+    const booking = await bookingsRepo.getBookingById(bookingId);
+    if (!booking) {
+      throw new AppError('Reserva no encontrada', 404);
+    }
+
+    const finalAdultCount = adultCount !== undefined ? adultCount : booking.adultCount;
+    const finalChildCount = childCount !== undefined ? childCount : booking.childCount;
+    const finalSeniorCount = seniorCount !== undefined ? seniorCount : booking.seniorCount;
+    const finalNumberOfPeople = numberOfPeople !== undefined ? numberOfPeople : booking.numberOfPeople;
+
+    const totalCount = finalAdultCount + finalChildCount + finalSeniorCount;
+    if (totalCount !== finalNumberOfPeople) {
+      throw new AppError(
+        `La suma de adultCount (${finalAdultCount}) + childCount (${finalChildCount}) + seniorCount (${finalSeniorCount}) debe ser igual a numberOfPeople (${finalNumberOfPeople})`,
+        400
+      );
+    }
+  }
 
   // Si se está cambiando la planeación o el número de personas, validar disponibilidad
   if (activityScheduleId !== undefined || numberOfPeople !== undefined) {

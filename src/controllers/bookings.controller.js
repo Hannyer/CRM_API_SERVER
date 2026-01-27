@@ -154,7 +154,22 @@ async function checkAvailability(req, res) {
  *               numberOfPeople:
  *                 type: integer
  *                 minimum: 1
- *                 description: Cantidad de personas en la reserva
+ *                 description: Cantidad total de personas en la reserva
+ *               adultCount:
+ *                 type: integer
+ *                 minimum: 0
+ *                 default: 0
+ *                 description: Cantidad de adultos en la reserva
+ *               childCount:
+ *                 type: integer
+ *                 minimum: 0
+ *                 default: 0
+ *                 description: Cantidad de niños en la reserva
+ *               seniorCount:
+ *                 type: integer
+ *                 minimum: 0
+ *                 default: 0
+ *                 description: Cantidad de adultos mayores en la reserva
  *               passengerCount:
  *                 type: integer
  *                 minimum: 0
@@ -328,6 +343,12 @@ async function create(req, res) {
  *                         type: boolean
  *                       numberOfPeople:
  *                         type: integer
+ *                       adultCount:
+ *                         type: integer
+ *                       childCount:
+ *                         type: integer
+ *                       seniorCount:
+ *                         type: integer
  *                       passengerCount:
  *                         type: integer
  *                         nullable: true
@@ -462,6 +483,12 @@ async function list(req, res) {
  *                   type: boolean
  *                 numberOfPeople:
  *                   type: integer
+ *                 adultCount:
+ *                   type: integer
+ *                 childCount:
+ *                   type: integer
+ *                 seniorCount:
+ *                   type: integer
  *                 passengerCount:
  *                   type: integer
  *                   nullable: true
@@ -541,7 +568,19 @@ async function getById(req, res) {
  *               numberOfPeople:
  *                 type: integer
  *                 minimum: 1
- *                 description: Nueva cantidad de personas
+ *                 description: Nueva cantidad total de personas
+ *               adultCount:
+ *                 type: integer
+ *                 minimum: 0
+ *                 description: Nueva cantidad de adultos
+ *               childCount:
+ *                 type: integer
+ *                 minimum: 0
+ *                 description: Nueva cantidad de niños
+ *               seniorCount:
+ *                 type: integer
+ *                 minimum: 0
+ *                 description: Nueva cantidad de adultos mayores
  *               passengerCount:
  *                 type: integer
  *                 minimum: 0

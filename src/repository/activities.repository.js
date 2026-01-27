@@ -5,13 +5,13 @@ const { pool } = require('../config/db.pg');
  * Crea una actividad sin fechas (las fechas se agregan como planeaciones)
  * Retorna el registro creado.
  */
-async function createActivity({ activityTypeId, title, partySize, status = true }) {
+async function createActivity({ activityTypeId, title, partySize, adultPrice, childPrice, seniorPrice, status = true }) {
   const sql = `
-    INSERT INTO ops.activity (activity_type_id, title, party_size, status)
-    VALUES ($1::uuid, $2, $3::int, $4::bool)
-    RETURNING id, activity_type_id as "activityTypeId", title, party_size as "partySize", status;
+    INSERT INTO ops.activity (activity_type_id, title, party_size, adult_price, child_price, senior_price, status)
+    VALUES ($1::uuid, $2, $3::int, $4::numeric, $5::numeric, $6::numeric, $7::bool)
+    RETURNING id, activity_type_id as "activityTypeId", title, party_size as "partySize", adult_price as "adultPrice", child_price as "childPrice", senior_price as "seniorPrice", status;
   `;
-  const params = [activityTypeId, title, partySize, status];
+  const params = [activityTypeId, title, partySize, adultPrice, childPrice, seniorPrice, status];
   const { rows } = await pool.query(sql, params);
   return rows[0];
 }
@@ -103,6 +103,9 @@ async function getActivitiesByDate(date) {
       a.id,
       a.title,
       a.party_size as "partySize",
+      a.adult_price as "adultPrice",
+      a.child_price as "childPrice",
+      a.senior_price as "seniorPrice",
       a.status,
       s.id as "scheduleId",
       s.scheduled_start as "scheduledStart",
@@ -187,6 +190,9 @@ async function listActivities({ page = 1, limit = 10, status = null } = {}) {
       a.id,
       a.title,
       a.party_size as "partySize",
+      a.adult_price as "adultPrice",
+      a.child_price as "childPrice",
+      a.senior_price as "seniorPrice",
       a.status,
       at.id as "activityTypeId",
       at.name as "activityTypeName",
@@ -223,6 +229,9 @@ async function getActivityById(activityId) {
       a.id,
       a.title,
       a.party_size as "partySize",
+      a.adult_price as "adultPrice",
+      a.child_price as "childPrice",
+      a.senior_price as "seniorPrice",
       a.status,
       at.id as "activityTypeId",
       at.name as "activityTypeName",
@@ -240,7 +249,7 @@ async function getActivityById(activityId) {
 /**
  * Actualiza una actividad existente (sin fechas, solo datos básicos)
  */
-async function updateActivity(activityId, { activityTypeId, title, partySize, status }) {
+async function updateActivity(activityId, { activityTypeId, title, partySize, adultPrice, childPrice, seniorPrice, status }) {
   const updates = [];
   const params = [];
   let paramIndex = 1;
@@ -257,6 +266,18 @@ async function updateActivity(activityId, { activityTypeId, title, partySize, st
     updates.push(`party_size = $${paramIndex++}::int`);
     params.push(partySize);
   }
+  if (adultPrice !== undefined) {
+    updates.push(`adult_price = $${paramIndex++}::numeric`);
+    params.push(adultPrice);
+  }
+  if (childPrice !== undefined) {
+    updates.push(`child_price = $${paramIndex++}::numeric`);
+    params.push(childPrice);
+  }
+  if (seniorPrice !== undefined) {
+    updates.push(`senior_price = $${paramIndex++}::numeric`);
+    params.push(seniorPrice);
+  }
   if (status !== undefined) {
     updates.push(`status = $${paramIndex++}::bool`);
     params.push(status);
@@ -271,7 +292,7 @@ async function updateActivity(activityId, { activityTypeId, title, partySize, st
     UPDATE ops.activity
     SET ${updates.join(', ')}
     WHERE id = $${paramIndex}::uuid
-    RETURNING id, activity_type_id as "activityTypeId", title, party_size as "partySize", status;
+    RETURNING id, activity_type_id as "activityTypeId", title, party_size as "partySize", adult_price as "adultPrice", child_price as "childPrice", senior_price as "seniorPrice", status;
   `;
 
   const { rows } = await pool.query(sql, params);
@@ -291,7 +312,7 @@ async function toggleActivityStatus(activityId, status) {
     UPDATE ops.activity
     SET status = $1::bool
     WHERE id = $2::uuid
-    RETURNING id, activity_type_id as "activityTypeId", title, party_size as "partySize", status;
+    RETURNING id, activity_type_id as "activityTypeId", title, party_size as "partySize", adult_price as "adultPrice", child_price as "childPrice", senior_price as "seniorPrice", status;
     `,
     [status, activityId]
   );

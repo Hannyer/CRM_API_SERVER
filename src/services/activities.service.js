@@ -16,6 +16,9 @@ async function createActivity(payload) {
     activityTypeId,
     title,
     partySize,
+    adultPrice,
+    childPrice,
+    seniorPrice,
     languageIds = [],
     status = true,
   } = payload;
@@ -28,7 +31,10 @@ async function createActivity(payload) {
     const activity = await activitiesRepo.createActivity({ 
       activityTypeId, 
       title, 
-      partySize, 
+      partySize,
+      adultPrice,
+      childPrice,
+      seniorPrice,
       status 
     });
 
@@ -54,6 +60,9 @@ async function createActivityAndAssign(payload) {
     activityTypeId,
     title,
     partySize,
+    adultPrice,
+    childPrice,
+    seniorPrice,
     status = true,
   } = payload;
 
@@ -65,7 +74,10 @@ async function createActivityAndAssign(payload) {
     const activity = await activitiesRepo.createActivity({ 
       activityTypeId, 
       title, 
-      partySize, 
+      partySize,
+      adultPrice,
+      childPrice,
+      seniorPrice,
       status 
     });
 
@@ -97,7 +109,7 @@ async function getActivityById(activityId) {
   return activitiesRepo.getActivityById(activityId);
 }
 
-async function updateActivity(activityId, { activityTypeId, title, partySize, status, languageIds }) {
+async function updateActivity(activityId, { activityTypeId, title, partySize, adultPrice, childPrice, seniorPrice, status, languageIds }) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -107,6 +119,9 @@ async function updateActivity(activityId, { activityTypeId, title, partySize, st
       activityTypeId,
       title,
       partySize,
+      adultPrice,
+      childPrice,
+      seniorPrice,
       status
     });
 

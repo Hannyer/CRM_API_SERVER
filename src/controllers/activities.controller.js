@@ -136,6 +136,21 @@ async function list(req, res) {
  *                 type: string
  *               partySize:
  *                 type: integer
+ *               adultPrice:
+ *                 type: number
+ *                 format: decimal
+ *                 example: 50.00
+ *                 description: Precio para adultos
+ *               childPrice:
+ *                 type: number
+ *                 format: decimal
+ *                 example: 25.00
+ *                 description: Precio para niños
+ *               seniorPrice:
+ *                 type: number
+ *                 format: decimal
+ *                 example: 40.00
+ *                 description: Precio para adultos mayores
  *               status:
  *                 type: boolean
  *                 default: true
@@ -225,16 +240,54 @@ async function getById(req, res) {
  *     tags: [Activities]
  *     summary: Actualizar una actividad
  *     description: Actualiza la información de una actividad existente. Solo se actualizan los campos proporcionados.
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               activityTypeId:
+ *                 type: string
+ *                 format: uuid
+ *               title:
+ *                 type: string
+ *               partySize:
+ *                 type: integer
+ *               adultPrice:
+ *                 type: number
+ *                 format: decimal
+ *                 example: 50.00
+ *                 description: Precio para adultos
+ *               childPrice:
+ *                 type: number
+ *                 format: decimal
+ *                 example: 25.00
+ *                 description: Precio para niños
+ *               seniorPrice:
+ *                 type: number
+ *                 format: decimal
+ *                 example: 40.00
+ *                 description: Precio para adultos mayores
+ *               status:
+ *                 type: boolean
+ *               languageIds:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: uuid
  */
 async function update(req, res) {
   try {
     const { id } = req.params;
-    const { activityTypeId, title, partySize, status, languageIds } = req.body || {};
+    const { activityTypeId, title, partySize, adultPrice, childPrice, seniorPrice, status, languageIds } = req.body || {};
     
     const activity = await activitiesService.updateActivity(id, {
       activityTypeId,
       title,
       partySize,
+      adultPrice,
+      childPrice,
+      seniorPrice,
       status,
       languageIds
     });
