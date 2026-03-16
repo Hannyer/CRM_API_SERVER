@@ -189,6 +189,19 @@ async function checkAvailability(req, res) {
  *                 type: integer
  *                 minimum: 0
  *                 description: Cantidad de pasajeros para el transporte (opcional, solo si transport es true)
+ *               comment:
+ *                 type: string
+ *                 nullable: true
+ *                 description: Comentario/nota para la reserva
+ *               paymentTypeId:
+ *                 type: string
+ *                 format: uuid
+ *                 description: ID del tipo de pago (Efectivo, Tarjeta)
+ *               cardTypeId:
+ *                 type: string
+ *                 format: uuid
+ *                 nullable: true
+ *                 description: ID del tipo de tarjeta (requerido si el tipo de pago es Tarjeta)
  *               commissionPercentage:
  *                 type: number
  *                 format: float
@@ -238,6 +251,16 @@ async function checkAvailability(req, res) {
  *                   type: integer
  *                 passengerCount:
  *                   type: integer
+ *                   nullable: true
+ *                 comment:
+ *                   type: string
+ *                   nullable: true
+ *                 paymentTypeId:
+ *                   type: string
+ *                   format: uuid
+ *                 cardTypeId:
+ *                   type: string
+ *                   format: uuid
  *                   nullable: true
  *                 commissionPercentage:
  *                   type: number

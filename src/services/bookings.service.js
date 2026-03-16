@@ -29,6 +29,9 @@ async function createBooking(payload) {
     childCount = 0,
     seniorCount = 0,
     passengerCount = null,
+    comment = null,
+    paymentTypeId,
+    cardTypeId = null,
     commissionPercentage = null, // Si es null, se usa el de la compañía
     customerName,
     customerEmail = null,
@@ -104,6 +107,11 @@ async function createBooking(payload) {
     }
   }
 
+  // Validar paymentTypeId requerido
+  if (!paymentTypeId) {
+    throw new AppError('paymentTypeId es requerido', 400);
+  }
+
   // Crear la reserva
   const booking = await bookingsRepo.createBooking({
     activityScheduleId,
@@ -114,6 +122,9 @@ async function createBooking(payload) {
     childCount,
     seniorCount,
     passengerCount,
+    comment,
+    paymentTypeId,
+    cardTypeId,
     commissionPercentage: finalCommissionPercentage,
     customerName,
     customerEmail,

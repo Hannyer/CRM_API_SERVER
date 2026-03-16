@@ -94,6 +94,9 @@ async function createBooking({
   childCount = 0,
   seniorCount = 0,
   passengerCount = null,
+  comment = null,
+  paymentTypeId,
+  cardTypeId = null,
   commissionPercentage,
   customerName,
   customerEmail = null,
@@ -111,6 +114,9 @@ async function createBooking({
       child_count,
       senior_count,
       passenger_count,
+      comment,
+      payment_type_id,
+      card_type_id,
       commission_percentage,
       customer_name,
       customer_email,
@@ -118,7 +124,7 @@ async function createBooking({
       status,
       created_by
     )
-    VALUES ($1::uuid, $2::uuid, $3::bool, $4::int, $5::int, $6::int, $7::int, $8::int, $9::numeric, $10, $11, $12, $13, $14::uuid)
+    VALUES ($1::uuid, $2::uuid, $3::bool, $4::int, $5::int, $6::int, $7::int, $8::int, $9::text, $10::uuid, $11::uuid, $12::numeric, $13, $14, $15, $16, $17::uuid)
     RETURNING 
       id,
       activity_schedule_id as "activityScheduleId",
@@ -129,6 +135,9 @@ async function createBooking({
       child_count as "childCount",
       senior_count as "seniorCount",
       passenger_count as "passengerCount",
+      comment,
+      payment_type_id as "paymentTypeId",
+      card_type_id as "cardTypeId",
       commission_percentage as "commissionPercentage",
       customer_name as "customerName",
       customer_email as "customerEmail",
@@ -147,6 +156,9 @@ async function createBooking({
     childCount,
     seniorCount,
     passengerCount,
+    comment,
+    paymentTypeId,
+    cardTypeId,
     commissionPercentage,
     customerName,
     customerEmail,
@@ -199,6 +211,11 @@ async function listBookings({ page = 1, limit = 10, status = null, activitySched
       b.child_count as "childCount",
       b.senior_count as "seniorCount",
       b.passenger_count as "passengerCount",
+      b.comment,
+      b.payment_type_id as "paymentTypeId",
+      pt.name as "paymentTypeName",
+      b.card_type_id as "cardTypeId",
+      ct.name as "cardTypeName",
       b.commission_percentage as "commissionPercentage",
       b.customer_name as "customerName",
       b.customer_email as "customerEmail",
@@ -215,6 +232,8 @@ async function listBookings({ page = 1, limit = 10, status = null, activitySched
     JOIN ops.activity_schedule s ON s.id = b.activity_schedule_id
     JOIN ops.activity a ON a.id = s.activity_id
     LEFT JOIN ops.company c ON c.id = b.company_id
+    LEFT JOIN ops.payment_type pt ON pt.id = b.payment_type_id
+    LEFT JOIN ops.card_type ct ON ct.id = b.card_type_id
     ${whereClause}
     ORDER BY b.created_at DESC
     LIMIT $${paramIndex++} OFFSET $${paramIndex}
@@ -247,6 +266,11 @@ async function getBookingById(bookingId) {
       b.child_count as "childCount",
       b.senior_count as "seniorCount",
       b.passenger_count as "passengerCount",
+      b.comment,
+      b.payment_type_id as "paymentTypeId",
+      pt.name as "paymentTypeName",
+      b.card_type_id as "cardTypeId",
+      ct.name as "cardTypeName",
       b.commission_percentage as "commissionPercentage",
       b.customer_name as "customerName",
       b.customer_email as "customerEmail",
@@ -266,6 +290,8 @@ async function getBookingById(bookingId) {
     JOIN ops.activity_schedule s ON s.id = b.activity_schedule_id
     JOIN ops.activity a ON a.id = s.activity_id
     LEFT JOIN ops.company c ON c.id = b.company_id
+    LEFT JOIN ops.payment_type pt ON pt.id = b.payment_type_id
+    LEFT JOIN ops.card_type ct ON ct.id = b.card_type_id
     WHERE b.id = $1::uuid
     `,
     [bookingId]
@@ -286,6 +312,9 @@ async function updateBooking(bookingId, {
   childCount,
   seniorCount,
   passengerCount,
+  comment,
+  paymentTypeId,
+  cardTypeId,
   commissionPercentage,
   customerName,
   customerEmail,
@@ -327,6 +356,18 @@ async function updateBooking(bookingId, {
   if (passengerCount !== undefined) {
     updates.push(`passenger_count = $${paramIndex++}::int`);
     params.push(passengerCount);
+  }
+  if (comment !== undefined) {
+    updates.push(`comment = $${paramIndex++}::text`);
+    params.push(comment);
+  }
+  if (paymentTypeId !== undefined) {
+    updates.push(`payment_type_id = $${paramIndex++}::uuid`);
+    params.push(paymentTypeId);
+  }
+  if (cardTypeId !== undefined) {
+    updates.push(`card_type_id = $${paramIndex++}::uuid`);
+    params.push(cardTypeId);
   }
   if (commissionPercentage !== undefined) {
     updates.push(`commission_percentage = $${paramIndex++}::numeric`);
@@ -371,6 +412,9 @@ async function updateBooking(bookingId, {
       child_count as "childCount",
       senior_count as "seniorCount",
       passenger_count as "passengerCount",
+      comment,
+      payment_type_id as "paymentTypeId",
+      card_type_id as "cardTypeId",
       commission_percentage as "commissionPercentage",
       customer_name as "customerName",
       customer_email as "customerEmail",

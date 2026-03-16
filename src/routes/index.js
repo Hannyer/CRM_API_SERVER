@@ -1,4 +1,4 @@
-﻿const { Router } = require('express');
+const { Router } = require('express');
 const usersRoutes = require('./users.routes');
 const authRoutes = require('./auth.routes');
 const guidesRoutes = require('./guides.routes');
@@ -9,6 +9,8 @@ const transportRoutes = require('./transport.routes');
 const configRoutes = require('./config.routes');
 const companiesRoutes = require('./companies.routes');
 const bookingsRoutes = require('./bookings.routes');
+const paymentTypesRoutes = require('./payment-types.routes');
+const cardTypesRoutes = require('./card-types.routes');
 
 const router = Router();
  
@@ -22,6 +24,8 @@ router.use('/transport', transportRoutes);
 router.use('/config', configRoutes);
 router.use('/companies', companiesRoutes);
 router.use('/bookings', bookingsRoutes);  
+router.use('/payment-types', paymentTypesRoutes);
+router.use('/card-types', cardTypesRoutes);
 
 
 module.exports = router;
