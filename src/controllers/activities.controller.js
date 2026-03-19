@@ -794,6 +794,10 @@ async function getScheduleAvailability(req, res) {
   try {
     const { activityId, startDate, endDate } = req.query;
     
+    if (!activityId) {
+      return sendErrorResponse(res, { status: 400, message: 'activityId es requerido' });
+    }
+
     const filters = {};
     if (activityId) filters.activityId = activityId;
     if (startDate) filters.startDate = startDate;

@@ -19,13 +19,15 @@ router.post('/:activityId/schedules', ctrl.createSchedule);
 // Rutas específicas deben ir antes de las genéricas
 router.post('/:activityId/schedules/bulk', ctrl.bulkCreateSchedules);
 router.get('/:activityId/schedules/available', ctrl.getAvailableSchedulesByDate);
+// Ruta para consultar disponibilidad
+router.get('/schedules/availability', ctrl.getScheduleAvailability);
+
+// Rutas genéricas (IDs) deben ir después de las específicas
 router.get('/schedules/:scheduleId', ctrl.getScheduleById);
 router.put('/schedules/:scheduleId', ctrl.updateSchedule);
 router.put('/schedules/:scheduleId/toggle-status', ctrl.toggleScheduleStatus);
 router.delete('/schedules/:scheduleId', ctrl.deleteSchedule);
 // Ruta para agregar asistentes
 router.post('/schedules/:scheduleId/attendees', ctrl.addAttendeesToSchedule);
-// Ruta para consultar disponibilidad
-router.get('/schedules/availability', ctrl.getScheduleAvailability);
 
 module.exports = router;

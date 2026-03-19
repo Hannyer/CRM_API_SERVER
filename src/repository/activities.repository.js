@@ -593,27 +593,50 @@ async function addAttendeesToSchedule(scheduleId, quantity) {
 async function getScheduleAvailability(filters = {}) {
   const { activityId = null, startDate = null, endDate = null } = filters;
 
-  const { rows } = await pool.query(
-    `SELECT * FROM ops.get_schedule_availability($1::uuid, $2::date, $3::date)`,
-    [
-      activityId || null,
-      startDate || null,
-      endDate || null
-    ]
-  );
+  const where = [];
+  const params = [];
+  let i = 1;
 
-  return rows.map(row => ({
-    scheduleId: row.schedule_id,
-    activityId: row.activity_id,
-    activityTitle: row.activity_title,
-    scheduledDate: row.scheduled_date,
-    startTime: row.start_time,
-    endTime: row.end_time,
-    capacity: row.capacity,
-    bookedCount: row.booked_count,
-    availableSpots: row.available_spots,
-    status: row.status
-  }));
+  if (activityId) {
+    where.push(`s.activity_id = $${i++}::uuid`);
+    params.push(activityId);
+  }
+  if (startDate) {
+    where.push(`DATE(s.scheduled_start) >= $${i++}::date`);
+    params.push(startDate);
+  }
+  if (endDate) {
+    where.push(`DATE(s.scheduled_start) <= $${i++}::date`);
+    params.push(endDate);
+  }
+
+  const sql = `
+    SELECT 
+      s.id,
+      s.activity_id as "activityId",
+      s.scheduled_start as "scheduledStart",
+      s.scheduled_end as "scheduledEnd",
+      a.party_size as "capacity",
+      COALESCE(b.total_booked, 0) AS "bookedCount",
+      (a.party_size - COALESCE(b.total_booked, 0)) AS "availableSpots",
+      s.status
+    FROM ops.activity_schedule s
+    INNER JOIN ops.activity a 
+      ON a.id = s.activity_id
+    LEFT JOIN (
+      SELECT 
+        activity_schedule_id,
+        SUM(number_of_people) AS total_booked
+      FROM ops.booking
+      WHERE status != 'cancelled'
+      GROUP BY activity_schedule_id
+    ) b ON b.activity_schedule_id = s.id
+    ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+    ORDER BY s.scheduled_start ASC;
+  `;
+
+  const { rows } = await pool.query(sql, params);
+  return rows;
 }
 
 /**
