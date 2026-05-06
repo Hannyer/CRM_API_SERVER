@@ -193,6 +193,14 @@ curl --location 'http://localhost:3000/api/bookings/schedules/123e4567-e89b-12d3
 
 ---
 
+## 8. Obtener Configuración de Bookings por ID (GET)
+
+```bash
+curl --location 'http://localhost:3000/api/bookings/configurations/123e4567-e89b-12d3-a456-426614174000'
+```
+
+---
+
 ## Notas Importantes
 
 ### Validaciones de Campos de Personas

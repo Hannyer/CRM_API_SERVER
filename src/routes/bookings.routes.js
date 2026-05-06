@@ -6,6 +6,7 @@ const router = Router();
 // Rutas para obtener información de disponibilidad
 router.get('/activities/:activityId/schedules', ctrl.getAvailableSchedules);
 router.get('/schedules/:scheduleId/availability', ctrl.checkAvailability);
+router.get('/configurations/:id', ctrl.GetConfigurationsBookings);
 
 // Rutas CRUD de reservas
 router.get('/', ctrl.list);

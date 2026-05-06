@@ -138,6 +138,93 @@ async function checkAvailability(req, res) {
 
 /**
  * @openapi
+ * /api/bookings/configurations/{id}:
+ *   get:
+ *     tags: [Bookings]
+ *     summary: Obtener configuración de bookings por ID
+ *     description: Obtiene un registro de la tabla de configuración `ops.configuration` usando su ID.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: ID único de la configuración
+ *     responses:
+ *       200:
+ *         description: Configuración encontrada
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: string
+ *                   format: uuid
+ *                 key01:
+ *                   type: string
+ *                   nullable: true
+ *                 key02:
+ *                   type: string
+ *                   nullable: true
+ *                 key03:
+ *                   type: string
+ *                   nullable: true
+ *                 key04:
+ *                   type: string
+ *                   nullable: true
+ *                 key05:
+ *                   type: string
+ *                   nullable: true
+ *                 key06:
+ *                   type: string
+ *                   nullable: true
+ *                 value:
+ *                   type: string
+ *                   nullable: true
+ *                 description:
+ *                   type: string
+ *                   nullable: true
+ *                 observation:
+ *                   type: string
+ *                   nullable: true
+ *                 displayName:
+ *                   type: string
+ *                   nullable: true
+ *                 status:
+ *                   type: boolean
+ *                 createdAt:
+ *                   type: string
+ *                   format: date-time
+ *                   nullable: true
+ *                 updatedAt:
+ *                   type: string
+ *                   format: date-time
+ *                   nullable: true
+ *       404:
+ *         description: Configuración no encontrada
+ *       500:
+ *         description: Error interno del servidor
+ */
+async function GetConfigurationsBookings(req, res) {
+  try {
+    const { id } = req.params;
+    const configuration = await bookingsService.GetConfigurationsBookings(id);
+
+    if (!configuration) {
+      return sendErrorResponse(res, { status: 404, message: 'Configuración no encontrada' });
+    }
+
+    res.json(configuration);
+  } catch (e) {
+    console.error(e);
+    sendErrorResponse(res, e, 500, 'Error al obtener configuración de bookings');
+  }
+}
+
+/**
+ * @openapi
  * /api/bookings:
  *   post:
  *     tags: [Bookings]
@@ -742,6 +829,7 @@ async function cancel(req, res) {
 module.exports = { 
   getAvailableSchedules,
   checkAvailability,
+  GetConfigurationsBookings,
   create,
   list,
   getById,

@@ -83,6 +83,36 @@ async function checkAvailability(scheduleId) {
 }
 
 /**
+ * Obtiene una configuración de bookings por ID
+ */
+async function getConfigurationsBookings(configurationId) {
+  const { rows } = await pool.query(
+    `
+    SELECT
+      id,
+      key01,
+      key02,
+      key03,
+      key04,
+      key05,
+      key06,
+      value,
+      description,
+      observation,
+      display_name as "displayName",
+      status,
+      created_at as "createdAt",
+      updated_at as "updatedAt"
+    FROM ops."configuration"
+    WHERE id = $1::uuid
+    `,
+    [configurationId]
+  );
+
+  return rows[0] || null;
+}
+
+/**
  * Crea una nueva reserva
  */
 async function createBooking({
@@ -457,6 +487,7 @@ async function cancelBooking(bookingId) {
 module.exports = {
   getAvailableSchedulesByActivityId,
   checkAvailability,
+  getConfigurationsBookings,
   createBooking,
   listBookings,
   getBookingById,

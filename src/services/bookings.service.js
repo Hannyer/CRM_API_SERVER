@@ -17,6 +17,13 @@ async function checkAvailability(scheduleId) {
 }
 
 /**
+ * Obtiene configuración de bookings por ID
+ */
+async function GetConfigurationsBookings(configurationId) {
+  return bookingsRepo.getConfigurationsBookings(configurationId);
+}
+
+/**
  * Crea una nueva reserva con validaciones
  */
 async function createBooking(payload) {
@@ -269,6 +276,7 @@ async function cancelBooking(bookingId) {
 module.exports = {
   getAvailableSchedulesByActivityId,
   checkAvailability,
+  GetConfigurationsBookings,
   createBooking,
   listBookings,
   getBookingById,
