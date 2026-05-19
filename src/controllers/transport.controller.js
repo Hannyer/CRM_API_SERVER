@@ -286,7 +286,7 @@ async function getById(req, res) {
  */
 async function create(req, res) {
   try {
-    const { capacity, model, operationalStatus = true, status = true } = req.body || {};
+    const { capacity, model, operationalStatus = true, status = true, licensePlate, circulationPermitExpirationDate, ctpExpirationDate } = req.body || {};
     if (!capacity || !model) {
       return sendErrorResponse(res, { status: 400, message: 'capacity y model son requeridos' });
     }
@@ -295,7 +295,7 @@ async function create(req, res) {
       return sendErrorResponse(res, { status: 400, message: 'capacity debe ser un número mayor a 0' });
     }
 
-    const transport = await transportService.createTransport({ capacity, model, operationalStatus, status });
+    const transport = await transportService.createTransport({ capacity, model, operationalStatus, status, licensePlate, circulationPermitExpirationDate, ctpExpirationDate });
     res.status(201).json(transport);
   } catch (e) {
     console.error(e);

@@ -11,7 +11,7 @@ async function listTransports({ page = 1, limit = 10 } = {}) {
   
   // Obtener los registros paginados
   const { rows } = await pool.query(
-    `SELECT id, capacity, model, operational_status as "operationalStatus", status
+    `SELECT id, capacity, model, operational_status as "operationalStatus", status, license_plate, circulation_permit_expiration_date, ctp_expiration_date
      FROM ops.transport
      ORDER BY model
      LIMIT $1 OFFSET $2`,
@@ -27,13 +27,13 @@ async function listTransports({ page = 1, limit = 10 } = {}) {
   };
 }
 
-async function createTransport({ capacity, model, operationalStatus = true, status = true }) {
+async function createTransport({ capacity, model, operationalStatus = true, status = true, licensePlate, circulationPermitExpirationDate, ctpExpirationDate }) {
   const sql = `
-    INSERT INTO ops.transport (capacity, model, operational_status, status)
-    VALUES ($1, $2, $3, $4)
-    RETURNING id, capacity, model, operational_status as "operationalStatus", status;
+    INSERT INTO ops.transport (capacity, model, operational_status, status, license_plate, circulation_permit_expiration_date, ctp_expiration_date)
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
+    RETURNING id, capacity, model, operational_status as "operationalStatus", status, license_plate, circulation_permit_expiration_date, ctp_expiration_date;
   `;
-  const params = [capacity, model, operationalStatus, status];
+  const params = [capacity, model, operationalStatus, status, licensePlate, circulationPermitExpirationDate, ctpExpirationDate];
   const { rows } = await pool.query(sql, params);
   return rows[0];
 }
@@ -41,7 +41,7 @@ async function createTransport({ capacity, model, operationalStatus = true, stat
 async function getTransportById(transportId) {
   const { rows } = await pool.query(
     `
-    SELECT id, capacity, model, operational_status as "operationalStatus", status
+    SELECT id, capacity, model, operational_status as "operationalStatus", status, license_plate, circulation_permit_expiration_date, ctp_expiration_date
     FROM ops.transport
     WHERE id = $1
     `,

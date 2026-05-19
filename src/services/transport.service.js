@@ -4,12 +4,13 @@ async function listTransports({ page, limit } = {}) {
   return transportRepo.listTransports({ page, limit });
 }
 
-async function createTransport({ capacity, model, operationalStatus, status }) {
+async function createTransport({ capacity, model, operationalStatus, status, licensePlate, circulationPermitExpirationDate, ctpExpirationDate }) {
   return transportRepo.createTransport({
     capacity,
     model,
     operationalStatus: operationalStatus !== false,
     status: status !== false,
+    licensePlate, circulationPermitExpirationDate, ctpExpirationDate
   });
 }
 
