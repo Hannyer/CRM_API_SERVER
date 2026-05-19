@@ -40,6 +40,11 @@ async function createBooking(payload) {
     paymentTypeId,
     cardTypeId = null,
     commissionPercentage = null, // Si es null, se usa el de la compañía
+    subtotal = null,
+    vatAmount = null,
+    total = null,
+    exempt = false,
+    commissionAmount = null,
     customerName,
     customerEmail = null,
     customerPhone = null,
@@ -119,6 +124,18 @@ async function createBooking(payload) {
     throw new AppError('paymentTypeId es requerido', 400);
   }
 
+  const nonNegativeMoney = (label, value) => {
+    if (value === null || value === undefined) return;
+    const n = Number(value);
+    if (Number.isNaN(n) || n < 0) {
+      throw new AppError(`${label} debe ser un número mayor o igual a 0`, 400);
+    }
+  };
+  nonNegativeMoney('subtotal', subtotal);
+  nonNegativeMoney('vatAmount', vatAmount);
+  nonNegativeMoney('total', total);
+  nonNegativeMoney('commissionAmount', commissionAmount);
+
   // Crear la reserva
   const booking = await bookingsRepo.createBooking({
     activityScheduleId,
@@ -133,6 +150,11 @@ async function createBooking(payload) {
     paymentTypeId,
     cardTypeId,
     commissionPercentage: finalCommissionPercentage,
+    subtotal,
+    vatAmount,
+    total,
+    exempt: Boolean(exempt),
+    commissionAmount,
     customerName,
     customerEmail,
     customerPhone,
@@ -171,6 +193,11 @@ async function updateBooking(bookingId, payload) {
     seniorCount,
     passengerCount,
     commissionPercentage,
+    subtotal,
+    vatAmount,
+    total,
+    exempt,
+    commissionAmount,
     customerName,
     customerEmail,
     customerPhone,
@@ -246,6 +273,18 @@ async function updateBooking(bookingId, payload) {
       throw new AppError('El porcentaje de comisión debe estar entre 0 y 100', 400);
     }
   }
+
+  const nonNegativeMoney = (label, value) => {
+    if (value === null || value === undefined) return;
+    const n = Number(value);
+    if (Number.isNaN(n) || n < 0) {
+      throw new AppError(`${label} debe ser un número mayor o igual a 0`, 400);
+    }
+  };
+  nonNegativeMoney('subtotal', subtotal);
+  nonNegativeMoney('vatAmount', vatAmount);
+  nonNegativeMoney('total', total);
+  nonNegativeMoney('commissionAmount', commissionAmount);
 
   // Validar passenger_count si transport es true
   if (transport !== undefined && transport && passengerCount !== null && passengerCount !== undefined) {

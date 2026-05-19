@@ -7,6 +7,27 @@ http://localhost:3000/api/bookings
 
 ---
 
+## Campos monetarios (contrato JSON ↔ PostgreSQL)
+
+El API usa **camelCase** en JSON. En base de datos las columnas están en **snake_case** (inglés).
+
+| JSON (request/response) | Columna PostgreSQL `ops.booking` | Notas |
+|-------------------------|----------------------------------|--------|
+| `subtotal` | `subtotal` | Opcional; `NUMERIC(14,2)` |
+| `vatAmount` | `vat_amount` | Monto de IVA (valor), opcional |
+| `total` | `total` | Total general, opcional |
+| `exempt` | `exempt` | `boolean` (equivalente a bit); default `false` |
+| `commissionPercentage` | `commission_percentage` | 0–100 |
+| `commissionAmount` | `commission_amount` | Valor monetario de comisión, opcional |
+
+**Scripts SQL en el repo**
+
+- Migración modular: `scripts/migrations/2026-05-11_booking_subtotal_vat_exempt_commission_amount.sql` (incluye `total`).
+- Solo `total` si ya aplicaste una versión anterior sin esa columna: `scripts/migrations/2026-05-12_booking_total.sql`.
+- Script único consolidado (copiar/pegar): `scripts/booking_financial_columns_postgresql.sql`.
+
+---
+
 ## 1. Crear una Reserva (POST)
 
 ### Ejemplo 1: Reserva básica con desglose de personas
@@ -95,6 +116,49 @@ curl --location 'http://localhost:3000/api/bookings' \
   "customerEmail": "roberto.sanchez@example.com",
   "customerPhone": "+506 5555-5555",
   "status": "confirmed"
+}'
+```
+
+### Ejemplo 6: Reserva con subtotal, IVA, total, exonerado y comisión (montos)
+
+Sustituye `PAYMENT_TYPE_UUID` por un `id` real de `ops.payment_type` (por ejemplo el de Efectivo o Tarjeta). Si el pago es Tarjeta, incluye `cardTypeId`.
+
+```bash
+curl --location 'http://localhost:3000/api/bookings' \
+--header 'Content-Type: application/json' \
+--data '{
+  "activityScheduleId": "123e4567-e89b-12d3-a456-426614174000",
+  "numberOfPeople": 2,
+  "adultCount": 2,
+  "childCount": 0,
+  "seniorCount": 0,
+  "paymentTypeId": "PAYMENT_TYPE_UUID",
+  "commissionPercentage": 10,
+  "subtotal": 100.00,
+  "vatAmount": 13.00,
+  "total": 113.00,
+  "exempt": false,
+  "commissionAmount": 10.00,
+  "customerName": "Cliente Facturación",
+  "customerEmail": "factura@example.com",
+  "status": "pending"
+}'
+```
+
+**Exonerado de IVA** (`exempt: true`): suele enviarse `vatAmount: 0` y `total` igual al subtotal (según reglas de negocio del front).
+
+**Actualizar montos** (PUT): mismo cuerpo parcial; solo se persisten las propiedades enviadas.
+
+```bash
+curl --location --request PUT 'http://localhost:3000/api/bookings/BOOKING_UUID' \
+--header 'Content-Type: application/json' \
+--data '{
+  "subtotal": 200.00,
+  "vatAmount": 26.00,
+  "total": 226.00,
+  "exempt": false,
+  "commissionPercentage": 12.5,
+  "commissionAmount": 25.00
 }'
 ```
 

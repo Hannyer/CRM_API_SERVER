@@ -295,6 +295,34 @@ async function GetConfigurationsBookings(req, res) {
  *                 minimum: 0
  *                 maximum: 100
  *                 description: Porcentaje de comisión manual (opcional). Si se proporciona companyId y no se especifica este campo, se usará la comisión de la compañía
+ *               subtotal:
+ *                 type: number
+ *                 format: float
+ *                 minimum: 0
+ *                 nullable: true
+ *                 description: Subtotal antes de IVA
+ *               vatAmount:
+ *                 type: number
+ *                 format: float
+ *                 minimum: 0
+ *                 nullable: true
+ *                 description: Monto de IVA (VAT)
+ *               total:
+ *                 type: number
+ *                 format: float
+ *                 minimum: 0
+ *                 nullable: true
+ *                 description: Total general (p. ej. subtotal + IVA si no está exonerado)
+ *               exempt:
+ *                 type: boolean
+ *                 default: false
+ *                 description: Indica si la reserva está exonerada de impuestos
+ *               commissionAmount:
+ *                 type: number
+ *                 format: float
+ *                 minimum: 0
+ *                 nullable: true
+ *                 description: Monto de comisión (valor monetario)
  *               customerName:
  *                 type: string
  *                 description: Nombre del cliente
@@ -352,6 +380,24 @@ async function GetConfigurationsBookings(req, res) {
  *                 commissionPercentage:
  *                   type: number
  *                   format: float
+ *                 subtotal:
+ *                   type: number
+ *                   format: float
+ *                   nullable: true
+ *                 vatAmount:
+ *                   type: number
+ *                   format: float
+ *                   nullable: true
+ *                 total:
+ *                   type: number
+ *                   format: float
+ *                   nullable: true
+ *                 exempt:
+ *                   type: boolean
+ *                 commissionAmount:
+ *                   type: number
+ *                   format: float
+ *                   nullable: true
  *                 customerName:
  *                   type: string
  *                 customerEmail:
@@ -480,6 +526,24 @@ async function create(req, res) {
  *                       commissionPercentage:
  *                         type: number
  *                         format: float
+ *                       subtotal:
+ *                         type: number
+ *                         format: float
+ *                         nullable: true
+ *                       vatAmount:
+ *                         type: number
+ *                         format: float
+ *                         nullable: true
+ *                       total:
+ *                         type: number
+ *                         format: float
+ *                         nullable: true
+ *                       exempt:
+ *                         type: boolean
+ *                       commissionAmount:
+ *                         type: number
+ *                         format: float
+ *                         nullable: true
  *                       customerName:
  *                         type: string
  *                       customerEmail:
@@ -620,6 +684,24 @@ async function list(req, res) {
  *                 commissionPercentage:
  *                   type: number
  *                   format: float
+ *                 subtotal:
+ *                   type: number
+ *                   format: float
+ *                   nullable: true
+ *                 vatAmount:
+ *                   type: number
+ *                   format: float
+ *                   nullable: true
+ *                 total:
+ *                   type: number
+ *                   format: float
+ *                   nullable: true
+ *                 exempt:
+ *                   type: boolean
+ *                 commissionAmount:
+ *                   type: number
+ *                   format: float
+ *                   nullable: true
  *                 customerName:
  *                   type: string
  *                 customerEmail:
@@ -716,6 +798,28 @@ async function getById(req, res) {
  *                 minimum: 0
  *                 maximum: 100
  *                 description: Nuevo porcentaje de comisión
+ *               subtotal:
+ *                 type: number
+ *                 format: float
+ *                 minimum: 0
+ *                 nullable: true
+ *               vatAmount:
+ *                 type: number
+ *                 format: float
+ *                 minimum: 0
+ *                 nullable: true
+ *               total:
+ *                 type: number
+ *                 format: float
+ *                 minimum: 0
+ *                 nullable: true
+ *               exempt:
+ *                 type: boolean
+ *               commissionAmount:
+ *                 type: number
+ *                 format: float
+ *                 minimum: 0
+ *                 nullable: true
  *               customerName:
  *                 type: string
  *               customerEmail:

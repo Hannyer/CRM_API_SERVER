@@ -169,6 +169,11 @@ CREATE TABLE IF NOT EXISTS ops.booking (
     number_of_people INTEGER NOT NULL CHECK (number_of_people > 0),
     passenger_count INTEGER, -- opcional, para diferenciar adultos/niños si se requiere
     commission_percentage NUMERIC(5, 2) NOT NULL CHECK (commission_percentage >= 0 AND commission_percentage <= 100),
+    commission_amount NUMERIC(14, 2),
+    subtotal NUMERIC(14, 2),
+    vat_amount NUMERIC(14, 2),
+    total NUMERIC(14, 2),
+    exempt BOOLEAN NOT NULL DEFAULT false,
     customer_name VARCHAR(255) NOT NULL,
     customer_email VARCHAR(255),
     customer_phone VARCHAR(50),

@@ -128,6 +128,11 @@ async function createBooking({
   paymentTypeId,
   cardTypeId = null,
   commissionPercentage,
+  subtotal = null,
+  vatAmount = null,
+  total = null,
+  exempt = false,
+  commissionAmount = null,
   customerName,
   customerEmail = null,
   customerPhone = null,
@@ -148,13 +153,18 @@ async function createBooking({
       payment_type_id,
       card_type_id,
       commission_percentage,
+      subtotal,
+      vat_amount,
+      total,
+      exempt,
+      commission_amount,
       customer_name,
       customer_email,
       customer_phone,
       status,
       created_by
     )
-    VALUES ($1::uuid, $2::uuid, $3::bool, $4::int, $5::int, $6::int, $7::int, $8::int, $9::text, $10::uuid, $11::uuid, $12::numeric, $13, $14, $15, $16, $17::uuid)
+    VALUES ($1::uuid, $2::uuid, $3::bool, $4::int, $5::int, $6::int, $7::int, $8::int, $9::text, $10::uuid, $11::uuid, $12::numeric, $13::numeric, $14::numeric, $15::numeric, $16::bool, $17::numeric, $18, $19, $20, $21, $22::uuid)
     RETURNING 
       id,
       activity_schedule_id as "activityScheduleId",
@@ -169,6 +179,11 @@ async function createBooking({
       payment_type_id as "paymentTypeId",
       card_type_id as "cardTypeId",
       commission_percentage as "commissionPercentage",
+      subtotal,
+      vat_amount as "vatAmount",
+      total,
+      exempt,
+      commission_amount as "commissionAmount",
       customer_name as "customerName",
       customer_email as "customerEmail",
       customer_phone as "customerPhone",
@@ -190,6 +205,11 @@ async function createBooking({
     paymentTypeId,
     cardTypeId,
     commissionPercentage,
+    subtotal,
+    vatAmount,
+    total,
+    exempt,
+    commissionAmount,
     customerName,
     customerEmail,
     customerPhone,
@@ -247,6 +267,11 @@ async function listBookings({ page = 1, limit = 10, status = null, activitySched
       b.card_type_id as "cardTypeId",
       ct.name as "cardTypeName",
       b.commission_percentage as "commissionPercentage",
+      b.subtotal,
+      b.vat_amount as "vatAmount",
+      b.total,
+      b.exempt,
+      b.commission_amount as "commissionAmount",
       b.customer_name as "customerName",
       b.customer_email as "customerEmail",
       b.customer_phone as "customerPhone",
@@ -302,6 +327,11 @@ async function getBookingById(bookingId) {
       b.card_type_id as "cardTypeId",
       ct.name as "cardTypeName",
       b.commission_percentage as "commissionPercentage",
+      b.subtotal,
+      b.vat_amount as "vatAmount",
+      b.total,
+      b.exempt,
+      b.commission_amount as "commissionAmount",
       b.customer_name as "customerName",
       b.customer_email as "customerEmail",
       b.customer_phone as "customerPhone",
@@ -346,6 +376,11 @@ async function updateBooking(bookingId, {
   paymentTypeId,
   cardTypeId,
   commissionPercentage,
+  subtotal,
+  vatAmount,
+  total,
+  exempt,
+  commissionAmount,
   customerName,
   customerEmail,
   customerPhone,
@@ -403,6 +438,26 @@ async function updateBooking(bookingId, {
     updates.push(`commission_percentage = $${paramIndex++}::numeric`);
     params.push(commissionPercentage);
   }
+  if (subtotal !== undefined) {
+    updates.push(`subtotal = $${paramIndex++}::numeric`);
+    params.push(subtotal);
+  }
+  if (vatAmount !== undefined) {
+    updates.push(`vat_amount = $${paramIndex++}::numeric`);
+    params.push(vatAmount);
+  }
+  if (total !== undefined) {
+    updates.push(`total = $${paramIndex++}::numeric`);
+    params.push(total);
+  }
+  if (exempt !== undefined) {
+    updates.push(`exempt = $${paramIndex++}::bool`);
+    params.push(exempt);
+  }
+  if (commissionAmount !== undefined) {
+    updates.push(`commission_amount = $${paramIndex++}::numeric`);
+    params.push(commissionAmount);
+  }
   if (customerName !== undefined) {
     updates.push(`customer_name = $${paramIndex++}`);
     params.push(customerName);
@@ -446,6 +501,11 @@ async function updateBooking(bookingId, {
       payment_type_id as "paymentTypeId",
       card_type_id as "cardTypeId",
       commission_percentage as "commissionPercentage",
+      subtotal,
+      vat_amount as "vatAmount",
+      total,
+      exempt,
+      commission_amount as "commissionAmount",
       customer_name as "customerName",
       customer_email as "customerEmail",
       customer_phone as "customerPhone",
