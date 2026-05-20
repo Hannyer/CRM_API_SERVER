@@ -59,7 +59,25 @@ async function login(req, res) {
     const isExternal = rolClienteValue != null && String(user.role) === String(rolClienteValue);
 
     const token = 'fake.jwt.token';
-    return res.json({ token, user: { ...user, isexternal: isExternal } });
+    const {
+      password_hash: _passwordHash,
+      ...safeUser
+    } = user;
+    return res.json({
+      token,
+      user: {
+        id: safeUser.id,
+        cedula: safeUser.cedula,
+        email: safeUser.email,
+        fullName: safeUser.full_name,
+        phone: safeUser.phone,
+        role: safeUser.role,
+        licenseExpirationDate: safeUser.license_expiration_date,
+        speaksEnglish: safeUser.speaks_english,
+        status: safeUser.status,
+        isexternal: isExternal,
+      },
+    });
   } catch (e) {
     console.error(e);
     return res.status(500).json({ message: 'Error interno' });

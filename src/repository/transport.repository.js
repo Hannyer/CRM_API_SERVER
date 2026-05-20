@@ -1,5 +1,14 @@
 const { pool } = require('../config/db.pg');
 
+const TRANSPORT_SELECT_FIELDS = `
+  id, capacity, model,
+  operational_status as "operationalStatus",
+  status,
+  license_plate as "licensePlate",
+  circulation_permit_expiration_date as "circulationPermitExpirationDate",
+  ctp_expiration_date as "ctpExpirationDate"
+`;
+
 async function listTransports({ page = 1, limit = 10 } = {}) {
   const offset = (page - 1) * limit;
   
@@ -11,7 +20,7 @@ async function listTransports({ page = 1, limit = 10 } = {}) {
   
   // Obtener los registros paginados
   const { rows } = await pool.query(
-    `SELECT id, capacity, model, operational_status as "operationalStatus", status, license_plate, circulation_permit_expiration_date, ctp_expiration_date
+    `SELECT ${TRANSPORT_SELECT_FIELDS}
      FROM ops.transport
      ORDER BY model
      LIMIT $1 OFFSET $2`,
@@ -27,11 +36,25 @@ async function listTransports({ page = 1, limit = 10 } = {}) {
   };
 }
 
+async function existsTransportByLicensePlate(licensePlate, excludeTransportId = null) {
+  const { rows } = await pool.query(
+    `
+    SELECT 1
+    FROM ops.transport
+    WHERE UPPER(TRIM(license_plate)) = UPPER(TRIM($1))
+      AND ($2::uuid IS NULL OR id <> $2)
+    LIMIT 1
+    `,
+    [licensePlate, excludeTransportId]
+  );
+  return rows.length > 0;
+}
+
 async function createTransport({ capacity, model, operationalStatus = true, status = true, licensePlate, circulationPermitExpirationDate, ctpExpirationDate }) {
   const sql = `
     INSERT INTO ops.transport (capacity, model, operational_status, status, license_plate, circulation_permit_expiration_date, ctp_expiration_date)
     VALUES ($1, $2, $3, $4, $5, $6, $7)
-    RETURNING id, capacity, model, operational_status as "operationalStatus", status, license_plate, circulation_permit_expiration_date, ctp_expiration_date;
+    RETURNING ${TRANSPORT_SELECT_FIELDS};
   `;
   const params = [capacity, model, operationalStatus, status, licensePlate, circulationPermitExpirationDate, ctpExpirationDate];
   const { rows } = await pool.query(sql, params);
@@ -41,7 +64,7 @@ async function createTransport({ capacity, model, operationalStatus = true, stat
 async function getTransportById(transportId) {
   const { rows } = await pool.query(
     `
-    SELECT id, capacity, model, operational_status as "operationalStatus", status, license_plate, circulation_permit_expiration_date, ctp_expiration_date
+    SELECT ${TRANSPORT_SELECT_FIELDS}
     FROM ops.transport
     WHERE id = $1
     `,
@@ -51,7 +74,15 @@ async function getTransportById(transportId) {
   return rows[0] || null;
 }
 
-async function updateTransport(transportId, { capacity, model, operationalStatus, status }) {
+async function updateTransport(transportId, {
+  capacity,
+  model,
+  operationalStatus,
+  status,
+  licensePlate,
+  circulationPermitExpirationDate,
+  ctpExpirationDate,
+}) {
   const updates = [];
   const params = [];
   let paramIndex = 1;
@@ -72,18 +103,31 @@ async function updateTransport(transportId, { capacity, model, operationalStatus
     updates.push(`status = $${paramIndex++}`);
     params.push(status);
   }
+  if (licensePlate !== undefined) {
+    updates.push(`license_plate = $${paramIndex++}`);
+    params.push(licensePlate);
+  }
+  if (circulationPermitExpirationDate !== undefined) {
+    updates.push(`circulation_permit_expiration_date = $${paramIndex++}`);
+    params.push(circulationPermitExpirationDate);
+  }
+  if (ctpExpirationDate !== undefined) {
+    updates.push(`ctp_expiration_date = $${paramIndex++}`);
+    params.push(ctpExpirationDate);
+  }
 
   if (updates.length === 0) {
     // Si no hay actualizaciones, devolvemos el transporte actual
     return getTransportById(transportId);
   }
 
+  updates.push('updated_at = CURRENT_TIMESTAMP');
   params.push(transportId);
   const sql = `
     UPDATE ops.transport
     SET ${updates.join(', ')}
     WHERE id = $${paramIndex}
-    RETURNING id, capacity, model, operational_status as "operationalStatus", status;
+    RETURNING ${TRANSPORT_SELECT_FIELDS};
   `;
 
   const { rows } = await pool.query(sql, params);
@@ -101,7 +145,7 @@ async function deleteTransport(transportId) {
     UPDATE ops.transport
     SET status = false
     WHERE id = $1
-    RETURNING id, capacity, model, operational_status as "operationalStatus", status;
+    RETURNING ${TRANSPORT_SELECT_FIELDS};
     `,
     [transportId]
   );
@@ -120,7 +164,7 @@ async function getAvailableTransports({ page = 1, limit = 10 } = {}) {
   
   // Obtener los registros paginados disponibles
   const { rows } = await pool.query(
-    `SELECT id, capacity, model, operational_status as "operationalStatus", status
+    `SELECT ${TRANSPORT_SELECT_FIELDS}
      FROM ops.transport
      WHERE operational_status = true AND status = true
      ORDER BY model
@@ -139,6 +183,7 @@ async function getAvailableTransports({ page = 1, limit = 10 } = {}) {
 
 module.exports = {
   listTransports,
+  existsTransportByLicensePlate,
   createTransport,
   getTransportById,
   updateTransport,

@@ -76,26 +76,53 @@ CREATE TABLE IF NOT EXISTS ops.transport (
     model VARCHAR(255) NOT NULL,
     operational_status BOOLEAN NOT NULL DEFAULT true,
     status BOOLEAN NOT NULL DEFAULT true,
+    license_plate VARCHAR(20) NOT NULL,
+    circulation_permit_expiration_date DATE NOT NULL,
+    ctp_expiration_date DATE NOT NULL,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_transport_operational_status ON ops.transport(operational_status);
 CREATE INDEX IF NOT EXISTS idx_transport_status ON ops.transport(status);
 CREATE INDEX IF NOT EXISTS idx_transport_model ON ops.transport(model);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_transport_license_plate_unique
+    ON ops.transport (UPPER(TRIM(license_plate)));
 
--- 2.6 Usuarios de aplicación (para autenticación y auditoría básica)
+-- 2.6 Roles de usuario (enum)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'app_user_role') THEN
+        CREATE TYPE ops.app_user_role AS ENUM (
+            'admin',
+            'driver',
+            'receptionist',
+            'operator',
+            'guide'
+        );
+    END IF;
+END $$;
+
+-- 2.7 Usuarios de aplicación (autenticación y mantenimiento)
 CREATE TABLE IF NOT EXISTS ops.app_user (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    email TEXT NOT NULL UNIQUE,
+    cedula VARCHAR(20) NOT NULL,
+    email TEXT NOT NULL,
     full_name TEXT NOT NULL,
+    phone VARCHAR(30) NOT NULL,
     password_hash TEXT,
-    role TEXT NOT NULL CHECK (role IN ('admin','operador')),
+    role ops.app_user_role NOT NULL,
+    license_expiration_date DATE,
+    speaks_english BOOLEAN NOT NULL DEFAULT false,
     status BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT app_user_email_key UNIQUE (email),
+    CONSTRAINT app_user_cedula_key UNIQUE (cedula)
 );
 CREATE INDEX IF NOT EXISTS idx_app_user_status ON ops.app_user(status);
 CREATE INDEX IF NOT EXISTS idx_app_user_role ON ops.app_user(role);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_app_user_cedula_unique
+    ON ops.app_user (UPPER(TRIM(cedula)));
 
 -- ============================================================
 -- 3. Actividades y planeaciones
@@ -330,7 +357,7 @@ INSERT INTO ops.configuration (
     value, description, display_name, status
 ) VALUES (
     'PARAMETRO', 'FUNCIONALIDAD', 'MRB', 'ROL', 'CLIENTE', 'ROLCLIENTE',
-    'operador', 'Rol asignado para clientes externos', 'Rol Cliente por Defecto', true
+    'operator', 'Rol asignado para clientes externos', 'Rol Cliente por Defecto', true
 );
 
 -- ============================================================
@@ -612,8 +639,8 @@ $$ LANGUAGE plpgsql;
 -- ============================================================
 
 -- Insertar un admin por defecto (cambiar password_hash por uno real/hasheado)
-INSERT INTO ops.app_user (email, full_name, password_hash, role)
-VALUES ('admin@example.com', 'Administrador', 'FuOfNI+qd0vGEY2gcFXKVQ==', 'admin')
+INSERT INTO ops.app_user (cedula, email, full_name, phone, password_hash, role, speaks_english)
+VALUES ('000000000', 'admin@example.com', 'Administrador', '00000000', 'FuOfNI+qd0vGEY2gcFXKVQ==', 'admin', false)
 ON CONFLICT (email) DO NOTHING;
 
 -- Insertar tipos de actividad base

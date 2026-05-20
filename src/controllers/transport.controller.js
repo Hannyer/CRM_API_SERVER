@@ -2,6 +2,44 @@ const transportService = require('../services/transport.service');
 const { AppError } = require('../utils/AppError');
 const { sendErrorResponse } = require('../utils/errorHandler');
 
+const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+function validateLicensePlate(licensePlate) {
+  if (licensePlate === undefined || licensePlate === null || licensePlate === '') {
+    return 'licensePlate es requerido';
+  }
+  if (typeof licensePlate !== 'string' || licensePlate.trim().length === 0 || licensePlate.length > 20) {
+    return 'licensePlate debe ser texto de 1 a 20 caracteres';
+  }
+  return null;
+}
+
+function validateRequiredDate(value, fieldName) {
+  if (value === undefined || value === null || value === '') {
+    return `${fieldName} es requerido (formato YYYY-MM-DD)`;
+  }
+  if (typeof value !== 'string' || !DATE_REGEX.test(value)) {
+    return `${fieldName} debe tener formato YYYY-MM-DD`;
+  }
+  return null;
+}
+
+function validateTransportDocumentFields({ licensePlate, circulationPermitExpirationDate, ctpExpirationDate }) {
+  const licenseError = validateLicensePlate(licensePlate);
+  if (licenseError) return licenseError;
+
+  const circulationError = validateRequiredDate(
+    circulationPermitExpirationDate,
+    'circulationPermitExpirationDate'
+  );
+  if (circulationError) return circulationError;
+
+  const ctpError = validateRequiredDate(ctpExpirationDate, 'ctpExpirationDate');
+  if (ctpError) return ctpError;
+
+  return null;
+}
+
 /**
  * @openapi
  * /api/transport:
@@ -272,7 +310,13 @@ async function getById(req, res) {
  *             schema:
  *               $ref: '#/components/schemas/Transport'
  *       400:
- *         description: Datos inválidos (capacity y model son requeridos)
+ *         description: Datos inválidos (campos requeridos o formato incorrecto)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       409:
+ *         description: Ya existe un transporte con esa placa
  *         content:
  *           application/json:
  *             schema:
@@ -287,18 +331,51 @@ async function getById(req, res) {
 async function create(req, res) {
   try {
     const { capacity, model, operationalStatus = true, status = true, licensePlate, circulationPermitExpirationDate, ctpExpirationDate } = req.body || {};
-    if (!capacity || !model) {
-      return sendErrorResponse(res, { status: 400, message: 'capacity y model son requeridos' });
+    if (
+      !capacity ||
+      !model ||
+      !licensePlate ||
+      !circulationPermitExpirationDate ||
+      !ctpExpirationDate
+    ) {
+      return sendErrorResponse(res, {
+        status: 400,
+        message:
+          'capacity, model, licensePlate, circulationPermitExpirationDate y ctpExpirationDate son requeridos',
+      });
     }
 
     if (typeof capacity !== 'number' || capacity < 1) {
       return sendErrorResponse(res, { status: 400, message: 'capacity debe ser un número mayor a 0' });
     }
 
-    const transport = await transportService.createTransport({ capacity, model, operationalStatus, status, licensePlate, circulationPermitExpirationDate, ctpExpirationDate });
+    const docFieldsError = validateTransportDocumentFields({
+      licensePlate,
+      circulationPermitExpirationDate,
+      ctpExpirationDate,
+    });
+    if (docFieldsError) {
+      return sendErrorResponse(res, { status: 400, message: docFieldsError });
+    }
+
+    const transport = await transportService.createTransport({
+      capacity,
+      model,
+      operationalStatus,
+      status,
+      licensePlate: licensePlate?.trim(),
+      circulationPermitExpirationDate,
+      ctpExpirationDate,
+    });
     res.status(201).json(transport);
   } catch (e) {
     console.error(e);
+    if (String(e.message).toLowerCase().includes('unique') || e?.code === '23505') {
+      return sendErrorResponse(res, {
+        status: 409,
+        message: 'Ya existe un transporte registrado con esa placa',
+      });
+    }
     sendErrorResponse(res, e, 500, 'Error al crear transporte');
   }
 }
@@ -343,6 +420,12 @@ async function create(req, res) {
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *       409:
+ *         description: Ya existe un transporte con esa placa
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: Error interno del servidor
  *         content:
@@ -353,17 +436,44 @@ async function create(req, res) {
 async function update(req, res) {
   try {
     const { id } = req.params;
-    const { capacity, model, operationalStatus, status } = req.body || {};
-    
+    const {
+      capacity,
+      model,
+      operationalStatus,
+      status,
+      licensePlate,
+      circulationPermitExpirationDate,
+      ctpExpirationDate,
+    } = req.body || {};
+
     if (capacity !== undefined && (typeof capacity !== 'number' || capacity < 1)) {
       return sendErrorResponse(res, { status: 400, message: 'capacity debe ser un número mayor a 0' });
     }
-    
+
+    if (!licensePlate || !circulationPermitExpirationDate || !ctpExpirationDate) {
+      return sendErrorResponse(res, {
+        status: 400,
+        message: 'licensePlate, circulationPermitExpirationDate y ctpExpirationDate son requeridos',
+      });
+    }
+
+    const docFieldsError = validateTransportDocumentFields({
+      licensePlate,
+      circulationPermitExpirationDate,
+      ctpExpirationDate,
+    });
+    if (docFieldsError) {
+      return sendErrorResponse(res, { status: 400, message: docFieldsError });
+    }
+
     const transport = await transportService.updateTransport(id, {
       capacity,
       model,
       operationalStatus,
-      status
+      status,
+      licensePlate: licensePlate.trim(),
+      circulationPermitExpirationDate,
+      ctpExpirationDate,
     });
     
     if (!transport) {
@@ -373,6 +483,12 @@ async function update(req, res) {
     res.json(transport);
   } catch (e) {
     console.error(e);
+    if (String(e.message).toLowerCase().includes('unique') || e?.code === '23505') {
+      return sendErrorResponse(res, {
+        status: 409,
+        message: 'Ya existe un transporte registrado con esa placa',
+      });
+    }
     sendErrorResponse(res, e, 500, 'Error al actualizar transporte');
   }
 }

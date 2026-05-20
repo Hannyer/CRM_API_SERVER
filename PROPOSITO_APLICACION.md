@@ -147,6 +147,9 @@ El sistema está diseñado para automatizar y optimizar la gestión de un **nego
 - **Registro de unidades**:
   - Capacidad de pasajeros
   - Modelo del vehículo
+  - Placa (`licensePlate`)
+  - Vencimiento del permiso de circulación (`circulationPermitExpirationDate`)
+  - Vencimiento del CTP (`ctpExpirationDate`)
   - Estado operativo (activo/fuera de circulación)
   - Estado general del registro (soft delete)
 

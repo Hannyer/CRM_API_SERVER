@@ -78,6 +78,104 @@ module.exports = {
         },
       },
 
+      ActivityType: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid', example: '123e4567-e89b-12d3-a456-426614174000' },
+          name: { type: 'string', example: 'Canopy', description: 'Nombre del tipo de actividad (único)' },
+          description: { type: 'string', nullable: true, example: 'Tour de canopy por las copas de los árboles' },
+          status: { type: 'boolean', example: true, description: 'Estado del registro' },
+          createdAt: { type: 'string', format: 'date-time', example: '2024-01-01T00:00:00Z' },
+          updatedAt: { type: 'string', format: 'date-time', example: '2024-01-01T00:00:00Z' },
+        },
+      },
+
+      ActivityTypeListItem: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid', example: '123e4567-e89b-12d3-a456-426614174000' },
+          name: { type: 'string', example: 'Canopy' },
+          description: { type: 'string', nullable: true, example: 'Tour de canopy' },
+          status: { type: 'boolean', example: true },
+          createdAt: { type: 'string', format: 'date-time', example: '2024-01-01T00:00:00Z' },
+          updatedAt: { type: 'string', format: 'date-time', example: '2024-01-01T00:00:00Z' },
+        },
+      },
+
+      ActivityTypeCreateRequest: {
+        type: 'object',
+        required: ['name'],
+        properties: {
+          name: { type: 'string', example: 'Canopy', description: 'Nombre del tipo (obligatorio, único)' },
+          description: { type: 'string', nullable: true, example: 'Tour de canopy por las copas de los árboles' },
+          status: { type: 'boolean', example: true, description: 'Estado (por defecto true)' },
+        },
+      },
+
+      ActivityTypeUpdateRequest: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', example: 'Canopy Premium' },
+          description: { type: 'string', nullable: true, example: 'Descripción actualizada' },
+          status: { type: 'boolean', example: false },
+        },
+      },
+
+      UserRole: {
+        type: 'string',
+        enum: ['admin', 'driver', 'receptionist', 'operator', 'guide'],
+        example: 'operator',
+        description: 'admin | driver (conductor) | receptionist | operator | guide',
+      },
+
+      User: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          cedula: { type: 'string', example: '1-2345-6789' },
+          email: { type: 'string', format: 'email', example: 'usuario@correo.com' },
+          fullName: { type: 'string', example: 'Juan Pérez' },
+          phone: { type: 'string', example: '+506 8888-8888' },
+          role: { $ref: '#/components/schemas/UserRole' },
+          licenseExpirationDate: { type: 'string', format: 'date', nullable: true, example: '2026-12-31' },
+          speaksEnglish: { type: 'boolean', example: false },
+          status: { type: 'boolean', example: true },
+          createdAt: { type: 'string', format: 'date-time' },
+          updatedAt: { type: 'string', format: 'date-time' },
+        },
+      },
+
+      UserCreateRequest: {
+        type: 'object',
+        required: ['cedula', 'email', 'fullName', 'phone', 'password', 'role'],
+        properties: {
+          cedula: { type: 'string', example: '1-2345-6789' },
+          email: { type: 'string', format: 'email', example: 'usuario@correo.com' },
+          fullName: { type: 'string', example: 'Juan Pérez' },
+          phone: { type: 'string', example: '+506 8888-8888' },
+          password: { type: 'string', example: '123456' },
+          role: { $ref: '#/components/schemas/UserRole' },
+          licenseExpirationDate: { type: 'string', format: 'date', example: '2026-12-31', description: 'Obligatorio si role = driver' },
+          speaksEnglish: { type: 'boolean', example: false },
+          status: { type: 'boolean', example: true },
+        },
+      },
+
+      UserUpdateRequest: {
+        type: 'object',
+        properties: {
+          cedula: { type: 'string' },
+          email: { type: 'string', format: 'email' },
+          fullName: { type: 'string' },
+          phone: { type: 'string' },
+          password: { type: 'string', description: 'Nueva contraseña (opcional)' },
+          role: { $ref: '#/components/schemas/UserRole' },
+          licenseExpirationDate: { type: 'string', format: 'date', nullable: true },
+          speaksEnglish: { type: 'boolean' },
+          status: { type: 'boolean' },
+        },
+      },
+
       Guide: {
         type: 'object',
         properties: {
@@ -175,7 +273,11 @@ module.exports = {
           model: { type: 'string', example: 'Toyota Hiace 2023' },
           operationalStatus: { type: 'boolean', example: true, description: 'true = activo, false = fuera de circulación' },
           status: { type: 'boolean', example: true, description: 'Estado general del registro' },
+          licensePlate: { type: 'string', maxLength: 20, example: 'ABC-123', description: 'Placa del vehículo (única en el sistema, sin distinguir mayúsculas/minúsculas)' },
+          circulationPermitExpirationDate: { type: 'string', format: 'date', example: '2026-12-31', description: 'Fecha de vencimiento del permiso de circulación (YYYY-MM-DD)' },
+          ctpExpirationDate: { type: 'string', format: 'date', example: '2026-06-30', description: 'Fecha de vencimiento del CTP (YYYY-MM-DD)' },
         },
+        required: ['id', 'capacity', 'model', 'operationalStatus', 'status', 'licensePlate', 'circulationPermitExpirationDate', 'ctpExpirationDate'],
       },
 
       TransportListItem: {
@@ -186,27 +288,38 @@ module.exports = {
           model: { type: 'string', example: 'Toyota Hiace 2023' },
           operationalStatus: { type: 'boolean', example: true, description: 'true = activo, false = fuera de circulación' },
           status: { type: 'boolean', example: true, description: 'Estado general del registro' },
+          licensePlate: { type: 'string', maxLength: 20, example: 'ABC-123', description: 'Placa del vehículo (única en el sistema, sin distinguir mayúsculas/minúsculas)' },
+          circulationPermitExpirationDate: { type: 'string', format: 'date', example: '2026-12-31', description: 'Fecha de vencimiento del permiso de circulación (YYYY-MM-DD)' },
+          ctpExpirationDate: { type: 'string', format: 'date', example: '2026-06-30', description: 'Fecha de vencimiento del CTP (YYYY-MM-DD)' },
         },
+        required: ['id', 'capacity', 'model', 'operationalStatus', 'status', 'licensePlate', 'circulationPermitExpirationDate', 'ctpExpirationDate'],
       },
 
       TransportCreateRequest: {
         type: 'object',
-        required: ['capacity', 'model'],
+        required: ['capacity', 'model', 'licensePlate', 'circulationPermitExpirationDate', 'ctpExpirationDate'],
         properties: {
           capacity: { type: 'integer', example: 20, description: 'Capacidad de pasajeros (debe ser mayor a 0)' },
           model: { type: 'string', example: 'Toyota Hiace 2023' },
           operationalStatus: { type: 'boolean', example: true, description: 'Estado operativo (por defecto true)' },
           status: { type: 'boolean', example: true, description: 'Estado general (por defecto true)' },
+          licensePlate: { type: 'string', maxLength: 20, example: 'ABC-123', description: 'Placa del vehículo (máx. 20 caracteres, única)' },
+          circulationPermitExpirationDate: { type: 'string', format: 'date', example: '2026-12-31', description: 'Vencimiento del permiso de circulación (YYYY-MM-DD)' },
+          ctpExpirationDate: { type: 'string', format: 'date', example: '2026-06-30', description: 'Vencimiento del CTP (YYYY-MM-DD)' },
         },
       },
 
       TransportUpdateRequest: {
         type: 'object',
+        required: ['licensePlate', 'circulationPermitExpirationDate', 'ctpExpirationDate'],
         properties: {
           capacity: { type: 'integer', example: 25, description: 'Capacidad de pasajeros (debe ser mayor a 0)' },
           model: { type: 'string', example: 'Toyota Hiace 2024' },
           operationalStatus: { type: 'boolean', example: false, description: 'Estado operativo' },
           status: { type: 'boolean', example: true, description: 'Estado general' },
+          licensePlate: { type: 'string', maxLength: 20, example: 'XYZ-789', description: 'Placa del vehículo (máx. 20 caracteres, única)' },
+          circulationPermitExpirationDate: { type: 'string', format: 'date', example: '2027-01-15', description: 'Vencimiento del permiso de circulación (YYYY-MM-DD)' },
+          ctpExpirationDate: { type: 'string', format: 'date', example: '2027-01-15', description: 'Vencimiento del CTP (YYYY-MM-DD)' },
         },
       },
 
