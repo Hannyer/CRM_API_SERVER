@@ -11,6 +11,7 @@ const companiesRoutes = require('./companies.routes');
 const bookingsRoutes = require('./bookings.routes');
 const paymentTypesRoutes = require('./payment-types.routes');
 const cardTypesRoutes = require('./card-types.routes');
+const rolesRoutes = require('./roles.routes');
 
 const router = Router();
  
@@ -26,6 +27,7 @@ router.use('/companies', companiesRoutes);
 router.use('/bookings', bookingsRoutes);  
 router.use('/payment-types', paymentTypesRoutes);
 router.use('/card-types', cardTypesRoutes);
+router.use('/roles', rolesRoutes);
 
 
 module.exports = router;

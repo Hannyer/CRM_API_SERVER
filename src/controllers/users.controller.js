@@ -1,9 +1,10 @@
 const usersService = require('../services/users.service');
 const { sendErrorResponse } = require('../utils/errorHandler');
-const { USER_ROLE_VALUES, USER_ROLE_LABELS, DRIVER_ROLE } = require('../constants/userRoles');
 
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function validateRequiredText(value, fieldName) {
   if (value === undefined || value === null || typeof value !== 'string' || !value.trim()) {
@@ -19,23 +20,16 @@ function validateEmail(email) {
   return null;
 }
 
-function validateRole(role) {
-  if (!role) return 'role es requerido';
-  if (!USER_ROLE_VALUES.includes(role)) {
-    return `role inválido. Valores permitidos: ${USER_ROLE_VALUES.join(', ')}`;
+function validateRoleId(roleId) {
+  if (!roleId) return 'roleId es requerido';
+  if (typeof roleId !== 'string' || !UUID_REGEX.test(roleId.trim())) {
+    return 'roleId debe ser un UUID válido';
   }
   return null;
 }
 
-function validateLicenseExpirationDate(role, licenseExpirationDate) {
-  if (role === DRIVER_ROLE) {
-    if (!licenseExpirationDate) {
-      return 'licenseExpirationDate es obligatorio cuando el rol es driver';
-    }
-    if (typeof licenseExpirationDate !== 'string' || !DATE_REGEX.test(licenseExpirationDate)) {
-      return 'licenseExpirationDate debe tener formato YYYY-MM-DD';
-    }
-  } else if (
+function validateLicenseExpirationDateFormat(licenseExpirationDate) {
+  if (
     licenseExpirationDate !== undefined &&
     licenseExpirationDate !== null &&
     licenseExpirationDate !== ''
@@ -61,7 +55,7 @@ function validateCreateBody(body) {
     fullName,
     phone,
     password,
-    role,
+    roleId,
     licenseExpirationDate,
     speaksEnglish,
     status,
@@ -73,8 +67,8 @@ function validateCreateBody(body) {
     validateRequiredText(fullName, 'fullName'),
     validateRequiredText(phone, 'phone'),
     validateRequiredText(password, 'password'),
-    validateRole(role),
-    validateLicenseExpirationDate(role, licenseExpirationDate),
+    validateRoleId(roleId),
+    validateLicenseExpirationDateFormat(licenseExpirationDate),
     validateSpeaksEnglish(speaksEnglish),
   ];
 
@@ -86,7 +80,7 @@ function validateCreateBody(body) {
 }
 
 function validateUpdateBody(body) {
-  const { cedula, email, fullName, phone, role, licenseExpirationDate, speaksEnglish, status } =
+  const { cedula, email, fullName, phone, roleId, licenseExpirationDate, speaksEnglish, status } =
     body || {};
 
   if (cedula !== undefined) {
@@ -105,19 +99,13 @@ function validateUpdateBody(body) {
     const err = validateRequiredText(phone, 'phone');
     if (err) return err;
   }
-  if (role !== undefined) {
-    const err = validateRole(role);
+  if (roleId !== undefined) {
+    const err = validateRoleId(roleId);
     if (err) return err;
   }
-  if (
-    licenseExpirationDate !== undefined &&
-    licenseExpirationDate !== null &&
-    licenseExpirationDate !== ''
-  ) {
-    if (typeof licenseExpirationDate !== 'string' || !DATE_REGEX.test(licenseExpirationDate)) {
-      return 'licenseExpirationDate debe tener formato YYYY-MM-DD';
-    }
-  }
+
+  const licenseErr = validateLicenseExpirationDateFormat(licenseExpirationDate);
+  if (licenseErr) return licenseErr;
 
   const speaksErr = validateSpeaksEnglish(speaksEnglish);
   if (speaksErr) return speaksErr;
@@ -137,14 +125,16 @@ function validateUpdateBody(body) {
  *     summary: Listar roles de usuario disponibles
  *     responses:
  *       200:
- *         description: Roles del enum
+ *         description: Roles activos (value = roleId UUID)
  */
 async function listRoles(req, res) {
-  const roles = usersService.getAvailableRoles().map((value) => ({
-    value,
-    label: USER_ROLE_LABELS[value],
-  }));
-  res.json(roles);
+  try {
+    const roles = await usersService.getAvailableRoles();
+    res.json(roles);
+  } catch (e) {
+    console.error(e);
+    sendErrorResponse(res, e, 500, 'Error al listar roles');
+  }
 }
 
 /**
@@ -164,10 +154,8 @@ async function listRoles(req, res) {
  *         name: status
  *         schema: { type: boolean }
  *       - in: query
- *         name: role
- *         schema:
- *           type: string
- *           enum: [admin, driver, receptionist, operator, guide]
+ *         name: roleId
+ *         schema: { type: string, format: uuid }
  *     responses:
  *       200:
  *         description: Lista paginada
@@ -178,7 +166,7 @@ async function list(req, res) {
     const limit = parseInt(req.query.limit, 10) || 10;
     const status =
       req.query.status !== undefined ? req.query.status === 'true' : null;
-    const role = req.query.role || null;
+    const roleId = req.query.roleId || null;
 
     if (page < 1) {
       return sendErrorResponse(res, { status: 400, message: 'page debe ser mayor o igual a 1' });
@@ -189,11 +177,11 @@ async function list(req, res) {
     if (limit > 100) {
       return sendErrorResponse(res, { status: 400, message: 'limit no puede ser mayor a 100' });
     }
-    if (role && !USER_ROLE_VALUES.includes(role)) {
-      return sendErrorResponse(res, { status: 400, message: 'role de filtro inválido' });
+    if (roleId && !UUID_REGEX.test(roleId)) {
+      return sendErrorResponse(res, { status: 400, message: 'roleId de filtro inválido' });
     }
 
-    const data = await usersService.listUsers({ page, limit, status, role });
+    const data = await usersService.listUsers({ page, limit, status, roleId });
     res.json({
       items: data.items,
       pagination: {
@@ -235,16 +223,6 @@ async function getById(req, res) {
  *   post:
  *     tags: [Users]
  *     summary: Crear usuario
- *     requestBody:
- *       content:
- *         application/json:
- *           schema:
- *             $ref: '#/components/schemas/UserCreateRequest'
- *     responses:
- *       201:
- *         description: Usuario creado
- *       409:
- *         description: Cédula o correo duplicado
  */
 async function create(req, res) {
   try {

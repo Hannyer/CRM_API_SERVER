@@ -56,7 +56,8 @@ async function login(req, res) {
     if (!user.status) return unauthorized();
 
     const rolClienteValue = await configService.getRolClienteValue();
-    const isExternal = rolClienteValue != null && String(user.role) === String(rolClienteValue);
+    const isExternal =
+      rolClienteValue != null && String(user.role_id) === String(rolClienteValue);
 
     const token = 'fake.jwt.token';
     const {
@@ -71,7 +72,8 @@ async function login(req, res) {
         email: safeUser.email,
         fullName: safeUser.full_name,
         phone: safeUser.phone,
-        role: safeUser.role,
+        roleId: safeUser.role_id,
+        roleName: safeUser.role_name,
         licenseExpirationDate: safeUser.license_expiration_date,
         speaksEnglish: safeUser.speaks_english,
         status: safeUser.status,

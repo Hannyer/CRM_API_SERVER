@@ -1,37 +1,44 @@
 const { pool } = require('../config/db.pg');
 
 const USER_SELECT_FIELDS = `
-  id,
-  cedula,
-  email,
-  full_name as "fullName",
-  phone,
-  role,
-  license_expiration_date as "licenseExpirationDate",
-  speaks_english as "speaksEnglish",
-  status,
-  created_at as "createdAt",
-  updated_at as "updatedAt"
+  u.id,
+  u.cedula,
+  u.email,
+  u.full_name as "fullName",
+  u.phone,
+  u.role_id as "roleId",
+  r.name as "roleName",
+  r.requires_license as "roleRequiresLicense",
+  u.license_expiration_date as "licenseExpirationDate",
+  u.speaks_english as "speaksEnglish",
+  u.status,
+  u.created_at as "createdAt",
+  u.updated_at as "updatedAt"
 `;
 
-async function listUsers({ page = 1, limit = 10, status = null, role = null } = {}) {
+const USER_FROM_JOIN = `
+  FROM ops.app_user u
+  INNER JOIN ops.role r ON r.id = u.role_id
+`;
+
+async function listUsers({ page = 1, limit = 10, status = null, roleId = null } = {}) {
   const offset = (page - 1) * limit;
   const params = [];
   const conditions = [];
 
   if (status !== null) {
     params.push(status);
-    conditions.push(`status = $${params.length}`);
+    conditions.push(`u.status = $${params.length}`);
   }
-  if (role) {
-    params.push(role);
-    conditions.push(`role = $${params.length}::ops.app_user_role`);
+  if (roleId) {
+    params.push(roleId);
+    conditions.push(`u.role_id = $${params.length}::uuid`);
   }
 
   const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
   const countResult = await pool.query(
-    `SELECT COUNT(*) as total FROM ops.app_user ${whereClause}`,
+    `SELECT COUNT(*) as total ${USER_FROM_JOIN} ${whereClause}`,
     params
   );
   const total = parseInt(countResult.rows[0].total, 10);
@@ -43,9 +50,9 @@ async function listUsers({ page = 1, limit = 10, status = null, role = null } = 
   const { rows } = await pool.query(
     `
     SELECT ${USER_SELECT_FIELDS}
-    FROM ops.app_user
+    ${USER_FROM_JOIN}
     ${whereClause}
-    ORDER BY full_name ASC
+    ORDER BY u.full_name ASC
     LIMIT $${limitParam} OFFSET $${offsetParam}
     `,
     params
@@ -92,39 +99,41 @@ async function createUser({
   fullName,
   phone,
   passwordHash,
-  role,
+  roleId,
   licenseExpirationDate = null,
   speaksEnglish = false,
   status = true,
 }) {
-  const sql = `
+  const insertSql = `
     INSERT INTO ops.app_user (
-      cedula, email, full_name, phone, password_hash, role,
+      cedula, email, full_name, phone, password_hash, role_id,
       license_expiration_date, speaks_english, status
     )
-    VALUES ($1, $2, $3, $4, $5, $6::ops.app_user_role, $7, $8, $9)
-    RETURNING ${USER_SELECT_FIELDS};
+    VALUES ($1, $2, $3, $4, $5, $6::uuid, $7, $8, $9)
+    RETURNING id;
   `;
-  const { rows } = await pool.query(sql, [
+
+  const { rows: inserted } = await pool.query(insertSql, [
     cedula,
     email,
     fullName,
     phone,
     passwordHash,
-    role,
+    roleId,
     licenseExpirationDate,
     speaksEnglish,
     status,
   ]);
-  return rows[0];
+
+  return getUserById(inserted[0].id);
 }
 
 async function getUserById(userId) {
   const { rows } = await pool.query(
     `
     SELECT ${USER_SELECT_FIELDS}
-    FROM ops.app_user
-    WHERE id = $1::uuid
+    ${USER_FROM_JOIN}
+    WHERE u.id = $1::uuid
     `,
     [userId]
   );
@@ -135,19 +144,21 @@ async function getUserByEmail(email) {
   const { rows } = await pool.query(
     `
     SELECT
-      id,
-      cedula,
-      email,
-      full_name,
-      phone,
-      password_hash,
-      role,
-      license_expiration_date,
-      speaks_english,
-      status,
-      created_at
-    FROM ops.app_user
-    WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))
+      u.id,
+      u.cedula,
+      u.email,
+      u.full_name,
+      u.phone,
+      u.password_hash,
+      u.role_id,
+      r.name as role_name,
+      r.requires_license as role_requires_license,
+      u.license_expiration_date,
+      u.speaks_english,
+      u.status,
+      u.created_at
+    ${USER_FROM_JOIN}
+    WHERE LOWER(TRIM(u.email)) = LOWER(TRIM($1))
     LIMIT 1
     `,
     [email]
@@ -178,9 +189,9 @@ async function updateUser(userId, data) {
     }
   }
 
-  if (data.role !== undefined) {
-    updates.push(`role = $${paramIndex++}::ops.app_user_role`);
-    params.push(data.role);
+  if (data.roleId !== undefined) {
+    updates.push(`role_id = $${paramIndex++}::uuid`);
+    params.push(data.roleId);
   }
 
   if (updates.length === 0) {
@@ -194,11 +205,12 @@ async function updateUser(userId, data) {
     UPDATE ops.app_user
     SET ${updates.join(', ')}
     WHERE id = $${paramIndex}::uuid
-    RETURNING ${USER_SELECT_FIELDS};
+    RETURNING id;
   `;
 
   const { rows } = await pool.query(sql, params);
-  return rows[0] || null;
+  if (rows.length === 0) return null;
+  return getUserById(userId);
 }
 
 async function deleteUser(userId) {
@@ -207,11 +219,12 @@ async function deleteUser(userId) {
     UPDATE ops.app_user
     SET status = false, updated_at = CURRENT_TIMESTAMP
     WHERE id = $1::uuid
-    RETURNING ${USER_SELECT_FIELDS};
+    RETURNING id;
     `,
     [userId]
   );
-  return rows[0] || null;
+  if (rows.length === 0) return null;
+  return getUserById(userId);
 }
 
 module.exports = {

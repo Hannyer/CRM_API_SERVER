@@ -121,11 +121,62 @@ module.exports = {
         },
       },
 
-      UserRole: {
-        type: 'string',
-        enum: ['admin', 'driver', 'receptionist', 'operator', 'guide'],
-        example: 'operator',
-        description: 'admin | driver (conductor) | receptionist | operator | guide',
+      Role: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          name: { type: 'string', example: 'Operador' },
+          description: { type: 'string', nullable: true, example: 'Operaciones del día a día' },
+          requiresLicense: { type: 'boolean', example: false },
+          status: { type: 'boolean', example: true },
+          createdAt: { type: 'string', format: 'date-time' },
+          updatedAt: { type: 'string', format: 'date-time' },
+        },
+      },
+
+      RoleListItem: {
+        $ref: '#/components/schemas/Role',
+      },
+
+      RoleSelectItem: {
+        type: 'object',
+        properties: {
+          value: { type: 'string', format: 'uuid', description: 'ID del rol (roleId)' },
+          label: { type: 'string', example: 'Conductor' },
+          description: { type: 'string', nullable: true },
+          requiresLicense: { type: 'boolean', example: true },
+        },
+      },
+
+      RoleCreateRequest: {
+        type: 'object',
+        required: ['name'],
+        properties: {
+          name: { type: 'string', example: 'Supervisor' },
+          description: { type: 'string', nullable: true },
+          requiresLicense: { type: 'boolean', example: false },
+          status: { type: 'boolean', example: true },
+        },
+      },
+
+      RoleUpdateRequest: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', example: 'Supervisor de turno' },
+          description: { type: 'string', nullable: true },
+          requiresLicense: { type: 'boolean' },
+          status: { type: 'boolean' },
+        },
+      },
+
+      Pagination: {
+        type: 'object',
+        properties: {
+          page: { type: 'integer', example: 1 },
+          limit: { type: 'integer', example: 50 },
+          total: { type: 'integer', example: 5 },
+          totalPages: { type: 'integer', example: 1 },
+        },
       },
 
       User: {
@@ -136,7 +187,9 @@ module.exports = {
           email: { type: 'string', format: 'email', example: 'usuario@correo.com' },
           fullName: { type: 'string', example: 'Juan Pérez' },
           phone: { type: 'string', example: '+506 8888-8888' },
-          role: { $ref: '#/components/schemas/UserRole' },
+          roleId: { type: 'string', format: 'uuid', description: 'FK a ops.role.id' },
+          roleName: { type: 'string', example: 'Operador' },
+          roleRequiresLicense: { type: 'boolean', example: false },
           licenseExpirationDate: { type: 'string', format: 'date', nullable: true, example: '2026-12-31' },
           speaksEnglish: { type: 'boolean', example: false },
           status: { type: 'boolean', example: true },
@@ -147,15 +200,20 @@ module.exports = {
 
       UserCreateRequest: {
         type: 'object',
-        required: ['cedula', 'email', 'fullName', 'phone', 'password', 'role'],
+        required: ['cedula', 'email', 'fullName', 'phone', 'password', 'roleId'],
         properties: {
           cedula: { type: 'string', example: '1-2345-6789' },
           email: { type: 'string', format: 'email', example: 'usuario@correo.com' },
           fullName: { type: 'string', example: 'Juan Pérez' },
           phone: { type: 'string', example: '+506 8888-8888' },
           password: { type: 'string', example: '123456' },
-          role: { $ref: '#/components/schemas/UserRole' },
-          licenseExpirationDate: { type: 'string', format: 'date', example: '2026-12-31', description: 'Obligatorio si role = driver' },
+          roleId: { type: 'string', format: 'uuid', description: 'ID del rol. Ver GET /api/roles/select' },
+          licenseExpirationDate: {
+            type: 'string',
+            format: 'date',
+            example: '2026-12-31',
+            description: 'Obligatorio si el rol tiene requiresLicense = true',
+          },
           speaksEnglish: { type: 'boolean', example: false },
           status: { type: 'boolean', example: true },
         },
@@ -169,7 +227,7 @@ module.exports = {
           fullName: { type: 'string' },
           phone: { type: 'string' },
           password: { type: 'string', description: 'Nueva contraseña (opcional)' },
-          role: { $ref: '#/components/schemas/UserRole' },
+          roleId: { type: 'string', format: 'uuid' },
           licenseExpirationDate: { type: 'string', format: 'date', nullable: true },
           speaksEnglish: { type: 'boolean' },
           status: { type: 'boolean' },

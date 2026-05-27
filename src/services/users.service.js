@@ -1,7 +1,7 @@
 const usersRepo = require('../repository/user.repository');
+const rolesService = require('./roles.service');
 const { AppError } = require('../utils/AppError');
 const { encrypt } = require('../utils/crypto-compat');
-const { USER_ROLE_VALUES, DRIVER_ROLE } = require('../constants/userRoles');
 
 function normalizeCedula(cedula) {
   return cedula.trim();
@@ -27,28 +27,23 @@ async function assertUniqueEmail(email, excludeUserId = null) {
   return normalized;
 }
 
-function assertValidRole(role) {
-  if (!USER_ROLE_VALUES.includes(role)) {
-    throw new AppError(
-      `role inválido. Valores permitidos: ${USER_ROLE_VALUES.join(', ')}`,
-      400,
-      'INVALID_USER_ROLE'
-    );
-  }
+async function assertValidRoleId(roleId) {
+  await rolesService.assertActiveRoleId(roleId);
 }
 
-function assertDriverLicenseDate(role, licenseExpirationDate) {
-  if (role === DRIVER_ROLE && !licenseExpirationDate) {
+async function assertDriverLicenseDate(roleId, licenseExpirationDate) {
+  const requiresLicense = await rolesService.roleRequiresLicense(roleId);
+  if (requiresLicense && !licenseExpirationDate) {
     throw new AppError(
-      'licenseExpirationDate es obligatorio cuando el rol es driver',
+      'licenseExpirationDate es obligatorio para el rol seleccionado',
       400,
       'DRIVER_LICENSE_REQUIRED'
     );
   }
 }
 
-async function listUsers({ page, limit, status, role } = {}) {
-  return usersRepo.listUsers({ page, limit, status, role });
+async function listUsers({ page, limit, status, roleId } = {}) {
+  return usersRepo.listUsers({ page, limit, status, roleId });
 }
 
 async function createUser(payload) {
@@ -58,14 +53,14 @@ async function createUser(payload) {
     fullName,
     phone,
     password,
-    role,
+    roleId,
     licenseExpirationDate,
     speaksEnglish,
     status,
   } = payload;
 
-  assertValidRole(role);
-  assertDriverLicenseDate(role, licenseExpirationDate);
+  await assertValidRoleId(roleId);
+  await assertDriverLicenseDate(roleId, licenseExpirationDate);
 
   const normalizedCedula = await assertUniqueCedula(cedula);
   const normalizedEmail = await assertUniqueEmail(email);
@@ -76,7 +71,7 @@ async function createUser(payload) {
     fullName: fullName.trim(),
     phone: phone.trim(),
     passwordHash: encrypt(password),
-    role,
+    roleId: roleId.trim(),
     licenseExpirationDate: licenseExpirationDate || null,
     speaksEnglish: !!speaksEnglish,
     status: status !== false,
@@ -106,9 +101,9 @@ async function updateUser(userId, payload) {
   if (payload.password !== undefined && payload.password !== '') {
     updateData.passwordHash = encrypt(payload.password);
   }
-  if (payload.role !== undefined) {
-    assertValidRole(payload.role);
-    updateData.role = payload.role;
+  if (payload.roleId !== undefined) {
+    await assertValidRoleId(payload.roleId);
+    updateData.roleId = payload.roleId.trim();
   }
   if (payload.licenseExpirationDate !== undefined) {
     updateData.licenseExpirationDate = payload.licenseExpirationDate || null;
@@ -119,13 +114,13 @@ async function updateUser(userId, payload) {
   const current = await usersRepo.getUserById(userId);
   if (!current) return null;
 
-  const effectiveRole = updateData.role ?? current.role;
+  const effectiveRoleId = updateData.roleId ?? current.roleId;
   const effectiveLicense =
     updateData.licenseExpirationDate !== undefined
       ? updateData.licenseExpirationDate
       : current.licenseExpirationDate;
 
-  assertDriverLicenseDate(effectiveRole, effectiveLicense);
+  await assertDriverLicenseDate(effectiveRoleId, effectiveLicense);
 
   return usersRepo.updateUser(userId, updateData);
 }
@@ -134,8 +129,14 @@ async function deleteUser(userId) {
   return usersRepo.deleteUser(userId);
 }
 
-function getAvailableRoles() {
-  return USER_ROLE_VALUES;
+async function getAvailableRoles() {
+  const roles = await rolesService.listActiveRolesForSelect();
+  return roles.map((r) => ({
+    value: r.id,
+    label: r.name,
+    description: r.description,
+    requiresLicense: r.requiresLicense,
+  }));
 }
 
 module.exports = {
