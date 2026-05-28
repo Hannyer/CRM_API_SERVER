@@ -1,141 +1,6 @@
 const usersService = require('../services/users.service');
 const { sendErrorResponse } = require('../utils/errorHandler');
 
-const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-function validateRequiredText(value, fieldName) {
-  if (value === undefined || value === null || typeof value !== 'string' || !value.trim()) {
-    return `${fieldName} es requerido`;
-  }
-  return null;
-}
-
-function validateEmail(email) {
-  if (!email || typeof email !== 'string' || !EMAIL_REGEX.test(email.trim())) {
-    return 'email es requerido y debe tener un formato válido';
-  }
-  return null;
-}
-
-function validateRoleId(roleId) {
-  if (!roleId) return 'roleId es requerido';
-  if (typeof roleId !== 'string' || !UUID_REGEX.test(roleId.trim())) {
-    return 'roleId debe ser un UUID válido';
-  }
-  return null;
-}
-
-function validateLicenseExpirationDateFormat(licenseExpirationDate) {
-  if (
-    licenseExpirationDate !== undefined &&
-    licenseExpirationDate !== null &&
-    licenseExpirationDate !== ''
-  ) {
-    if (typeof licenseExpirationDate !== 'string' || !DATE_REGEX.test(licenseExpirationDate)) {
-      return 'licenseExpirationDate debe tener formato YYYY-MM-DD';
-    }
-  }
-  return null;
-}
-
-function validateSpeaksEnglish(value) {
-  if (value !== undefined && typeof value !== 'boolean') {
-    return 'speaksEnglish debe ser un valor booleano';
-  }
-  return null;
-}
-
-function validateCreateBody(body) {
-  const {
-    cedula,
-    email,
-    fullName,
-    phone,
-    password,
-    roleId,
-    licenseExpirationDate,
-    speaksEnglish,
-    status,
-  } = body || {};
-
-  const checks = [
-    validateRequiredText(cedula, 'cedula'),
-    validateEmail(email),
-    validateRequiredText(fullName, 'fullName'),
-    validateRequiredText(phone, 'phone'),
-    validateRequiredText(password, 'password'),
-    validateRoleId(roleId),
-    validateLicenseExpirationDateFormat(licenseExpirationDate),
-    validateSpeaksEnglish(speaksEnglish),
-  ];
-
-  if (status !== undefined && typeof status !== 'boolean') {
-    checks.push('status debe ser un valor booleano');
-  }
-
-  return checks.find(Boolean) || null;
-}
-
-function validateUpdateBody(body) {
-  const { cedula, email, fullName, phone, roleId, licenseExpirationDate, speaksEnglish, status } =
-    body || {};
-
-  if (cedula !== undefined) {
-    const err = validateRequiredText(cedula, 'cedula');
-    if (err) return err;
-  }
-  if (email !== undefined) {
-    const err = validateEmail(email);
-    if (err) return err;
-  }
-  if (fullName !== undefined) {
-    const err = validateRequiredText(fullName, 'fullName');
-    if (err) return err;
-  }
-  if (phone !== undefined) {
-    const err = validateRequiredText(phone, 'phone');
-    if (err) return err;
-  }
-  if (roleId !== undefined) {
-    const err = validateRoleId(roleId);
-    if (err) return err;
-  }
-
-  const licenseErr = validateLicenseExpirationDateFormat(licenseExpirationDate);
-  if (licenseErr) return licenseErr;
-
-  const speaksErr = validateSpeaksEnglish(speaksEnglish);
-  if (speaksErr) return speaksErr;
-
-  if (status !== undefined && typeof status !== 'boolean') {
-    return 'status debe ser un valor booleano';
-  }
-
-  return null;
-}
-
-/**
- * @openapi
- * /api/users/roles:
- *   get:
- *     tags: [Users]
- *     summary: Listar roles de usuario disponibles
- *     responses:
- *       200:
- *         description: Roles activos (value = roleId UUID)
- */
-async function listRoles(req, res) {
-  try {
-    const roles = await usersService.getAvailableRoles();
-    res.json(roles);
-  } catch (e) {
-    console.error(e);
-    sendErrorResponse(res, e, 500, 'Error al listar roles');
-  }
-}
 
 /**
  * @openapi
@@ -143,45 +8,79 @@ async function listRoles(req, res) {
  *   get:
  *     tags: [Users]
  *     summary: Listar usuarios
+ *     description: Obtiene una lista paginada de usuarios con opción de filtrar por estado y rol.
  *     parameters:
  *       - in: query
  *         name: page
- *         schema: { type: integer, minimum: 1, default: 1 }
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *         description: Número de página
  *       - in: query
  *         name: limit
- *         schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 10
+ *         description: Cantidad de registros por página
  *       - in: query
  *         name: status
- *         schema: { type: boolean }
+ *         required: false
+ *         schema:
+ *           type: boolean
+ *         description: Filtrar por estado activo (true) o inactivo (false)
  *       - in: query
  *         name: roleId
- *         schema: { type: string, format: uuid }
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: Filtrar por ID de rol específico (UUID)
  *     responses:
  *       200:
- *         description: Lista paginada
+ *         description: Lista paginada de usuarios
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 items:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/User'
+ *                 pagination:
+ *                   $ref: '#/components/schemas/Pagination'
+ *       400:
+ *         description: Petición inválida (formatos incorrectos)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Error interno del servidor
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 async function list(req, res) {
   try {
-    const page = parseInt(req.query.page, 10) || 1;
-    const limit = parseInt(req.query.limit, 10) || 10;
-    const status =
-      req.query.status !== undefined ? req.query.status === 'true' : null;
-    const roleId = req.query.roleId || null;
+    const { page, limit, status, roleId } = req.query;
+    
+    // Convertir status de string a boolean si viene provisto
+    const statusBool = status !== undefined ? status === 'true' : undefined;
 
-    if (page < 1) {
-      return sendErrorResponse(res, { status: 400, message: 'page debe ser mayor o igual a 1' });
-    }
-    if (limit < 1) {
-      return sendErrorResponse(res, { status: 400, message: 'limit debe ser mayor o igual a 1' });
-    }
-    if (limit > 100) {
-      return sendErrorResponse(res, { status: 400, message: 'limit no puede ser mayor a 100' });
-    }
-    if (roleId && !UUID_REGEX.test(roleId)) {
-      return sendErrorResponse(res, { status: 400, message: 'roleId de filtro inválido' });
-    }
+    const data = await usersService.listUsers({ 
+      page, 
+      limit, 
+      status: statusBool, 
+      roleId 
+    });
 
-    const data = await usersService.listUsers({ page, limit, status, roleId });
     res.json({
       items: data.items,
       pagination: {
@@ -203,6 +102,40 @@ async function list(req, res) {
  *   get:
  *     tags: [Users]
  *     summary: Obtener usuario por ID
+ *     description: Obtiene la información detallada de un usuario por su identificador único (UUID).
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: ID único del usuario
+ *     responses:
+ *       200:
+ *         description: Información del usuario encontrada
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/User'
+ *       400:
+ *         description: ID de usuario inválido (formato UUID incorrecto)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       404:
+ *         description: Usuario no encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Error interno del servidor
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 async function getById(req, res) {
   try {
@@ -223,14 +156,41 @@ async function getById(req, res) {
  *   post:
  *     tags: [Users]
  *     summary: Crear usuario
+ *     description: Registra un nuevo usuario en el sistema. Realiza validaciones de unicidad de cédula/correo y lógica de licencia de conducir si aplica.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/UserCreateRequest'
+ *     responses:
+ *       201:
+ *         description: Usuario creado exitosamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/User'
+ *       400:
+ *         description: Datos requeridos faltantes o con formato inválido, o falta licencia para rol que lo exige
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       409:
+ *         description: Conflicto - Ya existe un usuario con la misma cédula o correo
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Error interno del servidor
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 async function create(req, res) {
   try {
-    const validationError = validateCreateBody(req.body);
-    if (validationError) {
-      return sendErrorResponse(res, { status: 400, message: validationError });
-    }
-
     const user = await usersService.createUser(req.body);
     res.status(201).json(user);
   } catch (e) {
@@ -251,14 +211,55 @@ async function create(req, res) {
  *   put:
  *     tags: [Users]
  *     summary: Actualizar usuario
+ *     description: Actualiza de forma parcial o total la información de un usuario existente.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: ID único del usuario a actualizar
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/UserUpdateRequest'
+ *     responses:
+ *       200:
+ *         description: Usuario actualizado exitosamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/User'
+ *       400:
+ *         description: Datos con formato inválido, o falta licencia para rol que lo exige
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       404:
+ *         description: Usuario no encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       409:
+ *         description: Conflicto - Cédula o correo ya en uso por otro usuario
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Error interno del servidor
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 async function update(req, res) {
   try {
-    const validationError = validateUpdateBody(req.body);
-    if (validationError) {
-      return sendErrorResponse(res, { status: 400, message: validationError });
-    }
-
     const user = await usersService.updateUser(req.params.id, req.body || {});
     if (!user) {
       return sendErrorResponse(res, { status: 404, message: 'Usuario no encontrado' });
@@ -282,6 +283,46 @@ async function update(req, res) {
  *   delete:
  *     tags: [Users]
  *     summary: Eliminar usuario (soft delete)
+ *     description: Inactiva un usuario en el sistema (establece su estado a false de forma lógica).
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: ID único del usuario a eliminar
+ *     responses:
+ *       200:
+ *         description: Usuario eliminado correctamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Usuario eliminado correctamente
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
+ *       400:
+ *         description: ID de usuario inválido (formato UUID incorrecto)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       404:
+ *         description: Usuario no encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Error interno del servidor
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 async function remove(req, res) {
   try {
@@ -296,4 +337,4 @@ async function remove(req, res) {
   }
 }
 
-module.exports = { listRoles, list, getById, create, update, remove };
+module.exports = { list, getById, create, update, remove };
