@@ -99,6 +99,7 @@ async function listForSelect(req, res) {
         label: r.name,
         description: r.description,
         requiresLicense: r.requiresLicense,
+        requiresLanguages: r.requiresLanguages,
       }))
     );
   } catch (e) {
@@ -167,7 +168,13 @@ async function getById(req, res) {
  */
 async function create(req, res) {
   try {
-    const { name, description, requiresLicense = false, status = true } = req.body || {};
+    const {
+      name,
+      description,
+      requiresLicense = false,
+      requiresLanguages = false,
+      status = true,
+    } = req.body || {};
     if (!name) {
       return sendErrorResponse(res, { status: 400, message: 'name es requerido' });
     }
@@ -176,6 +183,7 @@ async function create(req, res) {
       name,
       description,
       requiresLicense,
+      requiresLanguages,
       status,
     });
     res.status(201).json(role);
@@ -215,11 +223,12 @@ async function create(req, res) {
  */
 async function update(req, res) {
   try {
-    const { name, description, requiresLicense, status } = req.body || {};
+    const { name, description, requiresLicense, requiresLanguages, status } = req.body || {};
     const role = await rolesService.updateRole(req.params.id, {
       name,
       description,
       requiresLicense,
+      requiresLanguages,
       status,
     });
     if (!role) {

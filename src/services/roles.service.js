@@ -41,13 +41,19 @@ async function roleRequiresLicense(roleId) {
   return role?.requiresLicense === true;
 }
 
+async function roleRequiresLanguages(roleId) {
+  const role = await rolesRepo.getRoleById(roleId);
+  return role?.requiresLanguages === true;
+}
+
 async function createRole(payload) {
-  const { name, description, requiresLicense, status } = payload;
+  const { name, description, requiresLicense, requiresLanguages, status } = payload;
   assertValidName(name);
   return rolesRepo.createRole({
     name,
     description: description ?? null,
     requiresLicense: !!requiresLicense,
+    requiresLanguages: !!requiresLanguages,
     status: status !== false,
   });
 }
@@ -83,6 +89,7 @@ module.exports = {
   listActiveRolesForSelect,
   assertActiveRoleId,
   roleRequiresLicense,
+  roleRequiresLanguages,
   createRole,
   updateRole,
   deleteRole,

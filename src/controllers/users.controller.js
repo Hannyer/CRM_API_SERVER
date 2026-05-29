@@ -156,7 +156,7 @@ async function getById(req, res) {
  *   post:
  *     tags: [Users]
  *     summary: Crear usuario
- *     description: Registra un nuevo usuario en el sistema. Realiza validaciones de unicidad de cédula/correo y lógica de licencia de conducir si aplica.
+ *     description: Registra un nuevo usuario. Si roleId es Guía, languageIds (ops.language) es obligatorio y se guarda en ops.guide_language.
  *     requestBody:
  *       required: true
  *       content:
@@ -211,7 +211,7 @@ async function create(req, res) {
  *   put:
  *     tags: [Users]
  *     summary: Actualizar usuario
- *     description: Actualiza de forma parcial o total la información de un usuario existente.
+ *     description: Actualiza un usuario. Rol Guía requiere languageIds al cambiar de rol o si no tiene idiomas asignados.
  *     parameters:
  *       - in: path
  *         name: id

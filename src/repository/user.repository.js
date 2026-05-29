@@ -1,4 +1,5 @@
 const { pool } = require('../config/db.pg');
+const { LANGUAGE_JSON_AGG } = require('./user-languages.repository');
 
 const USER_SELECT_FIELDS = `
   u.id,
@@ -9,11 +10,13 @@ const USER_SELECT_FIELDS = `
   u.role_id as "roleId",
   r.name as "roleName",
   r.requires_license as "roleRequiresLicense",
+  r.requires_languages as "roleRequiresLanguages",
   u.license_expiration_date as "licenseExpirationDate",
   u.speaks_english as "speaksEnglish",
   u.status,
   u.created_at as "createdAt",
-  u.updated_at as "updatedAt"
+  u.updated_at as "updatedAt",
+  ${LANGUAGE_JSON_AGG}
 `;
 
 const USER_FROM_JOIN = `
@@ -103,29 +106,54 @@ async function createUser({
   licenseExpirationDate = null,
   speaksEnglish = false,
   status = true,
+  languageIds = [],
 }) {
-  const insertSql = `
-    INSERT INTO ops.app_user (
-      cedula, email, full_name, phone, password_hash, role_id,
-      license_expiration_date, speaks_english, status
-    )
-    VALUES ($1, $2, $3, $4, $5, $6::uuid, $7, $8, $9)
-    RETURNING id;
-  `;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
 
-  const { rows: inserted } = await pool.query(insertSql, [
-    cedula,
-    email,
-    fullName,
-    phone,
-    passwordHash,
-    roleId,
-    licenseExpirationDate,
-    speaksEnglish,
-    status,
-  ]);
+    const { rows: inserted } = await client.query(
+      `
+      INSERT INTO ops.app_user (
+        cedula, email, full_name, phone, password_hash, role_id,
+        license_expiration_date, speaks_english, status
+      )
+      VALUES ($1, $2, $3, $4, $5, $6::uuid, $7, $8, $9)
+      RETURNING id;
+      `,
+      [
+        cedula,
+        email,
+        fullName,
+        phone,
+        passwordHash,
+        roleId,
+        licenseExpirationDate,
+        speaksEnglish,
+        status,
+      ]
+    );
 
-  return getUserById(inserted[0].id);
+    const userId = inserted[0].id;
+
+    if (languageIds.length) {
+      await client.query(
+        `
+        INSERT INTO ops.guide_language (app_user_id, language_id)
+        SELECT $1::uuid, UNNEST($2::uuid[])
+        `,
+        [userId, languageIds]
+      );
+    }
+
+    await client.query('COMMIT');
+    return getUserById(userId);
+  } catch (e) {
+    await client.query('ROLLBACK');
+    throw e;
+  } finally {
+    client.release();
+  }
 }
 
 async function getUserById(userId) {
@@ -153,6 +181,7 @@ async function getUserByEmail(email) {
       u.role_id,
       r.name as role_name,
       r.requires_license as role_requires_license,
+      r.requires_languages as role_requires_languages,
       u.license_expiration_date,
       u.speaks_english,
       u.status,
@@ -167,6 +196,7 @@ async function getUserByEmail(email) {
 }
 
 async function updateUser(userId, data) {
+  const hasLanguageUpdate = data.languageIds !== undefined || data.clearLanguages;
   const updates = [];
   const params = [];
   let paramIndex = 1;
@@ -194,23 +224,59 @@ async function updateUser(userId, data) {
     params.push(data.roleId);
   }
 
-  if (updates.length === 0) {
+  if (updates.length === 0 && !hasLanguageUpdate) {
     return getUserById(userId);
   }
 
-  updates.push('updated_at = CURRENT_TIMESTAMP');
-  params.push(userId);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
 
-  const sql = `
-    UPDATE ops.app_user
-    SET ${updates.join(', ')}
-    WHERE id = $${paramIndex}::uuid
-    RETURNING id;
-  `;
+    if (updates.length > 0) {
+      updates.push('updated_at = CURRENT_TIMESTAMP');
+      params.push(userId);
 
-  const { rows } = await pool.query(sql, params);
-  if (rows.length === 0) return null;
-  return getUserById(userId);
+      const { rows } = await client.query(
+        `
+        UPDATE ops.app_user
+        SET ${updates.join(', ')}
+        WHERE id = $${paramIndex}::uuid
+        RETURNING id;
+        `,
+        params
+      );
+
+      if (rows.length === 0) {
+        await client.query('ROLLBACK');
+        return null;
+      }
+    }
+
+    if (data.languageIds !== undefined) {
+      await client.query(`DELETE FROM ops.guide_language WHERE app_user_id = $1::uuid`, [
+        userId,
+      ]);
+      if (data.languageIds.length) {
+        await client.query(
+          `
+          INSERT INTO ops.guide_language (app_user_id, language_id)
+          SELECT $1::uuid, UNNEST($2::uuid[])
+          `,
+          [userId, data.languageIds]
+        );
+      }
+    } else if (data.clearLanguages) {
+      await client.query(`DELETE FROM ops.guide_language WHERE app_user_id = $1::uuid`, [userId]);
+    }
+
+    await client.query('COMMIT');
+    return getUserById(userId);
+  } catch (e) {
+    await client.query('ROLLBACK');
+    throw e;
+  } finally {
+    client.release();
+  }
 }
 
 async function deleteUser(userId) {

@@ -5,6 +5,7 @@ const ROLE_SELECT_FIELDS = `
   name,
   description,
   requires_license as "requiresLicense",
+  requires_languages as "requiresLanguages",
   status,
   created_at as "createdAt",
   updated_at as "updatedAt"
@@ -66,7 +67,7 @@ async function existsActiveRoleById(id) {
 async function listActiveRolesForSelect() {
   const { rows } = await pool.query(
     `
-    SELECT id, name, description, requires_license as "requiresLicense"
+    SELECT id, name, description, requires_license as "requiresLicense", requires_languages as "requiresLanguages"
     FROM ops.role
     WHERE status = true
     ORDER BY name ASC
@@ -75,19 +76,25 @@ async function listActiveRolesForSelect() {
   return rows;
 }
 
-async function createRole({ name, description = null, requiresLicense = false, status = true }) {
+async function createRole({
+  name,
+  description = null,
+  requiresLicense = false,
+  requiresLanguages = false,
+  status = true,
+}) {
   const { rows } = await pool.query(
     `
-    INSERT INTO ops.role (name, description, requires_license, status)
-    VALUES (trim($1), $2, $3::bool, $4::bool)
+    INSERT INTO ops.role (name, description, requires_license, requires_languages, status)
+    VALUES (trim($1), $2, $3::bool, $4::bool, $5::bool)
     RETURNING ${ROLE_SELECT_FIELDS}
     `,
-    [name, description, requiresLicense, status]
+    [name, description, requiresLicense, requiresLanguages, status]
   );
   return rows[0];
 }
 
-async function updateRole(id, { name, description, requiresLicense, status }) {
+async function updateRole(id, { name, description, requiresLicense, requiresLanguages, status }) {
   const updates = [];
   const params = [];
   let paramIndex = 1;
@@ -103,6 +110,10 @@ async function updateRole(id, { name, description, requiresLicense, status }) {
   if (requiresLicense !== undefined) {
     updates.push(`requires_license = $${paramIndex++}::bool`);
     params.push(requiresLicense);
+  }
+  if (requiresLanguages !== undefined) {
+    updates.push(`requires_languages = $${paramIndex++}::bool`);
+    params.push(requiresLanguages);
   }
   if (status !== undefined) {
     updates.push(`status = $${paramIndex++}::bool`);

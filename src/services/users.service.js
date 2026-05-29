@@ -1,4 +1,5 @@
 const usersRepo = require('../repository/user.repository');
+const userLanguagesRepo = require('../repository/user-languages.repository');
 const rolesService = require('./roles.service');
 const { AppError } = require('../utils/AppError');
 const { encrypt } = require('../utils/crypto-compat');
@@ -66,6 +67,61 @@ function validateStatus(value) {
   }
 }
 
+function normalizeLanguageIds(languageIds) {
+  if (languageIds === undefined || languageIds === null) {
+    return [];
+  }
+  if (!Array.isArray(languageIds)) {
+    throw new AppError('languageIds debe ser un arreglo de UUID', 400, 'INVALID_LANGUAGE_IDS');
+  }
+  const ids = [...new Set(languageIds.map((id) => String(id).trim()).filter(Boolean))];
+  for (const id of ids) {
+    if (!UUID_REGEX.test(id)) {
+      throw new AppError(`languageId inválido: ${id}`, 400, 'INVALID_LANGUAGE_IDS');
+    }
+  }
+  return ids;
+}
+
+async function assertLanguagesExist(languageIds) {
+  if (!languageIds.length) return;
+  const found = await userLanguagesRepo.countActiveLanguagesByIds(languageIds);
+  if (found !== languageIds.length) {
+    throw new AppError(
+      'Uno o más languageIds no existen o están inactivos en ops.language',
+      400,
+      'INVALID_LANGUAGE_IDS'
+    );
+  }
+}
+
+async function resolveLanguageIdsForRole(roleId, languageIds, { required = false } = {}) {
+  const requiresLanguages = await rolesService.roleRequiresLanguages(roleId);
+  const normalized = normalizeLanguageIds(languageIds);
+
+  if (!requiresLanguages) {
+    if (normalized.length > 0) {
+      throw new AppError(
+        'languageIds solo aplica para usuarios con rol Guía',
+        400,
+        'GUIDE_LANGUAGES_NOT_ALLOWED'
+      );
+    }
+    return [];
+  }
+
+  if (required && normalized.length === 0) {
+    throw new AppError(
+      'languageIds es obligatorio cuando el rol es Guía (al menos un idioma)',
+      400,
+      'GUIDE_LANGUAGES_REQUIRED'
+    );
+  }
+
+  await assertLanguagesExist(normalized);
+  return normalized;
+}
+
 async function assertUniqueCedula(cedula, excludeUserId = null) {
   const normalized = normalizeCedula(cedula);
   if (await usersRepo.existsUserByCedula(normalized, excludeUserId)) {
@@ -128,9 +184,9 @@ async function createUser(payload) {
     licenseExpirationDate,
     speaksEnglish,
     status,
+    languageIds,
   } = payload || {};
 
-  // Validaciones
   validateRequiredText(cedula, 'cedula');
   validateEmail(email);
   validateRequiredText(fullName, 'fullName');
@@ -143,6 +199,10 @@ async function createUser(payload) {
 
   await assertValidRoleId(roleId);
   await assertDriverLicenseDate(roleId, licenseExpirationDate);
+
+  const resolvedLanguageIds = await resolveLanguageIdsForRole(roleId, languageIds, {
+    required: true,
+  });
 
   const normalizedCedula = await assertUniqueCedula(cedula);
   const normalizedEmail = await assertUniqueEmail(email);
@@ -157,6 +217,7 @@ async function createUser(payload) {
     licenseExpirationDate: licenseExpirationDate || null,
     speaksEnglish: !!speaksEnglish,
     status: status !== false,
+    languageIds: resolvedLanguageIds,
   });
 }
 
@@ -172,7 +233,7 @@ async function getUserById(userId) {
 
 async function updateUser(userId, payload) {
   validateUserId(userId);
-  
+
   const {
     cedula,
     email,
@@ -182,10 +243,10 @@ async function updateUser(userId, payload) {
     roleId,
     licenseExpirationDate,
     speaksEnglish,
-    status
+    status,
+    languageIds,
   } = payload || {};
 
-  // Validaciones
   if (cedula !== undefined) validateRequiredText(cedula, 'cedula');
   if (email !== undefined) validateEmail(email);
   if (fullName !== undefined) validateRequiredText(fullName, 'fullName');
@@ -194,6 +255,9 @@ async function updateUser(userId, payload) {
   validateLicenseExpirationDateFormat(licenseExpirationDate);
   validateSpeaksEnglish(speaksEnglish);
   validateStatus(status);
+
+  const current = await usersRepo.getUserById(userId);
+  if (!current) return null;
 
   const updateData = {};
 
@@ -218,9 +282,6 @@ async function updateUser(userId, payload) {
   if (speaksEnglish !== undefined) updateData.speaksEnglish = !!speaksEnglish;
   if (status !== undefined) updateData.status = !!status;
 
-  const current = await usersRepo.getUserById(userId);
-  if (!current) return null;
-
   const effectiveRoleId = updateData.roleId ?? current.roleId;
   const effectiveLicense =
     updateData.licenseExpirationDate !== undefined
@@ -228,6 +289,35 @@ async function updateUser(userId, payload) {
       : current.licenseExpirationDate;
 
   await assertDriverLicenseDate(effectiveRoleId, effectiveLicense);
+
+  const roleChanged = updateData.roleId !== undefined && updateData.roleId !== current.roleId;
+  const willRequireLanguages = await rolesService.roleRequiresLanguages(effectiveRoleId);
+
+  if (!willRequireLanguages) {
+    updateData.clearLanguages = true;
+  } else if (languageIds !== undefined) {
+    updateData.languageIds = await resolveLanguageIdsForRole(effectiveRoleId, languageIds, {
+      required: true,
+    });
+  } else if (roleChanged) {
+    const existingCount = Array.isArray(current.languages) ? current.languages.length : 0;
+    if (existingCount === 0) {
+      throw new AppError(
+        'languageIds es obligatorio al asignar el rol Guía',
+        400,
+        'GUIDE_LANGUAGES_REQUIRED'
+      );
+    }
+  } else {
+    const existingCount = Array.isArray(current.languages) ? current.languages.length : 0;
+    if (existingCount === 0) {
+      throw new AppError(
+        'El usuario Guía debe tener al menos un idioma (envíe languageIds)',
+        400,
+        'GUIDE_LANGUAGES_REQUIRED'
+      );
+    }
+  }
 
   return usersRepo.updateUser(userId, updateData);
 }
@@ -244,6 +334,7 @@ async function getAvailableRoles() {
     label: r.name,
     description: r.description,
     requiresLicense: r.requiresLicense,
+    requiresLanguages: r.requiresLanguages,
   }));
 }
 
