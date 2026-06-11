@@ -127,8 +127,6 @@ module.exports = {
           id: { type: 'string', format: 'uuid' },
           name: { type: 'string', example: 'Operador' },
           description: { type: 'string', nullable: true, example: 'Operaciones del día a día' },
-          requiresLicense: { type: 'boolean', example: false },
-          requiresLanguages: { type: 'boolean', example: false },
           status: { type: 'boolean', example: true },
           createdAt: { type: 'string', format: 'date-time' },
           updatedAt: { type: 'string', format: 'date-time' },
@@ -145,8 +143,16 @@ module.exports = {
           value: { type: 'string', format: 'uuid', description: 'ID del rol (roleId)' },
           label: { type: 'string', example: 'Conductor' },
           description: { type: 'string', nullable: true },
-          requiresLicense: { type: 'boolean', example: true },
-          requiresLanguages: { type: 'boolean', example: true },
+          requiresLicense: {
+            type: 'boolean',
+            example: true,
+            description: 'true para Conductor (b07fe1a3-40e2-4cb8-9fd7-ff6df2a2dba3): exige licenseExpirationDate',
+          },
+          requiresLanguages: {
+            type: 'boolean',
+            example: true,
+            description: 'true para Guía (9d3372fa-7180-4f04-9727-374e9b513d53): exige languageIds',
+          },
         },
       },
 
@@ -156,8 +162,6 @@ module.exports = {
         properties: {
           name: { type: 'string', example: 'Supervisor' },
           description: { type: 'string', nullable: true },
-          requiresLicense: { type: 'boolean', example: false },
-          requiresLanguages: { type: 'boolean', example: false },
           status: { type: 'boolean', example: true },
         },
       },
@@ -167,8 +171,6 @@ module.exports = {
         properties: {
           name: { type: 'string', example: 'Supervisor de turno' },
           description: { type: 'string', nullable: true },
-          requiresLicense: { type: 'boolean' },
-          requiresLanguages: { type: 'boolean' },
           status: { type: 'boolean' },
         },
       },

@@ -9,8 +9,6 @@ const USER_SELECT_FIELDS = `
   u.phone,
   u.role_id as "roleId",
   r.name as "roleName",
-  r.requires_license as "roleRequiresLicense",
-  r.requires_languages as "roleRequiresLanguages",
   u.license_expiration_date as "licenseExpirationDate",
   u.speaks_english as "speaksEnglish",
   u.status,

@@ -98,8 +98,8 @@ async function listForSelect(req, res) {
         value: r.id,
         label: r.name,
         description: r.description,
-        requiresLicense: r.requiresLicense,
-        requiresLanguages: r.requiresLanguages,
+        requiresLicense: r.requiresLicense === true,
+        requiresLanguages: r.requiresLanguages === true,
       }))
     );
   } catch (e) {
@@ -171,8 +171,6 @@ async function create(req, res) {
     const {
       name,
       description,
-      requiresLicense = false,
-      requiresLanguages = false,
       status = true,
     } = req.body || {};
     if (!name) {
@@ -182,8 +180,6 @@ async function create(req, res) {
     const role = await rolesService.createRole({
       name,
       description,
-      requiresLicense,
-      requiresLanguages,
       status,
     });
     res.status(201).json(role);

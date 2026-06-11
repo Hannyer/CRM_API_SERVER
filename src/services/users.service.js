@@ -2,6 +2,7 @@ const usersRepo = require('../repository/user.repository');
 const userLanguagesRepo = require('../repository/user-languages.repository');
 const rolesService = require('./roles.service');
 const { AppError } = require('../utils/AppError');
+const { isConductorRole, isGuiaRole } = require('../constants/roleIds');
 const { encrypt } = require('../utils/crypto-compat');
 
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -112,7 +113,9 @@ async function resolveLanguageIdsForRole(roleId, languageIds, { required = false
 
   if (required && normalized.length === 0) {
     throw new AppError(
-      'languageIds es obligatorio cuando el rol es Guía (al menos un idioma)',
+      isGuiaRole(roleId)
+        ? 'languageIds es obligatorio para el rol Guía (al menos un idioma)'
+        : 'languageIds es obligatorio para el rol seleccionado (al menos un idioma)',
       400,
       'GUIDE_LANGUAGES_REQUIRED'
     );
@@ -146,7 +149,9 @@ async function assertDriverLicenseDate(roleId, licenseExpirationDate) {
   const requiresLicense = await rolesService.roleRequiresLicense(roleId);
   if (requiresLicense && !licenseExpirationDate) {
     throw new AppError(
-      'licenseExpirationDate es obligatorio para el rol seleccionado',
+      isConductorRole(roleId)
+        ? 'licenseExpirationDate es obligatorio para el rol Conductor'
+        : 'licenseExpirationDate es obligatorio para el rol seleccionado',
       400,
       'DRIVER_LICENSE_REQUIRED'
     );

@@ -67,7 +67,12 @@ async function existsActiveRoleById(id) {
 async function listActiveRolesForSelect() {
   const { rows } = await pool.query(
     `
-    SELECT id, name, description, requires_license as "requiresLicense", requires_languages as "requiresLanguages"
+    SELECT
+      id,
+      name,
+      description,
+      requires_license as "requiresLicense",
+      requires_languages as "requiresLanguages"
     FROM ops.role
     WHERE status = true
     ORDER BY name ASC
@@ -79,17 +84,15 @@ async function listActiveRolesForSelect() {
 async function createRole({
   name,
   description = null,
-  requiresLicense = false,
-  requiresLanguages = false,
   status = true,
 }) {
   const { rows } = await pool.query(
     `
-    INSERT INTO ops.role (name, description, requires_license, requires_languages, status)
-    VALUES (trim($1), $2, $3::bool, $4::bool, $5::bool)
+    INSERT INTO ops.role (name, description, status)
+    VALUES (trim($1), $2, $3::bool)
     RETURNING ${ROLE_SELECT_FIELDS}
     `,
-    [name, description, requiresLicense, requiresLanguages, status]
+    [name, description, status]
   );
   return rows[0];
 }
