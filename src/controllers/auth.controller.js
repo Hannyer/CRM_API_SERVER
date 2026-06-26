@@ -59,7 +59,14 @@ async function login(req, res) {
     const isExternal =
       rolClienteValue != null && String(user.role_id) === String(rolClienteValue);
 
-    const token = 'fake.jwt.token';
+    const jwtSecret = process.env.JWT_SECRET || 'super-secret-default-key';
+    const jwt = require('jsonwebtoken');
+    const token = jwt.sign(
+      { id: user.id, roleId: user.role_id },
+      jwtSecret,
+      { expiresIn: '8h' }
+    );
+
     const {
       password_hash: _passwordHash,
       ...safeUser

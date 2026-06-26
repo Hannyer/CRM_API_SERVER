@@ -1,33 +1,36 @@
 const { Router } = require('express');
 const ctrl = require('../controllers/activities.controller');
+const { verifyToken, requirePermission } = require('../middlewares/auth.middleware');
 
 const router = Router();
 
+router.use(verifyToken);
+
 // Rutas para actividades
-router.get('/by-date', ctrl.getByDate);
-router.get('/', ctrl.list);
-router.get('/:id', ctrl.getById);
-router.post('/', ctrl.create);
-router.put('/:id', ctrl.update);
-router.put('/:id/toggle-status', ctrl.toggleStatus);
-router.put('/:id/assignments', ctrl.replaceAssignments);
-router.delete('/:id', ctrl.remove);
+router.get('/by-date', requirePermission('activities'), ctrl.getByDate);
+router.get('/', requirePermission('activities'), ctrl.list);
+router.get('/:id', requirePermission('activities'), ctrl.getById);
+router.post('/', requirePermission('activities'), ctrl.create);
+router.put('/:id', requirePermission('activities'), ctrl.update);
+router.put('/:id/toggle-status', requirePermission('activities'), ctrl.toggleStatus);
+router.put('/:id/assignments', requirePermission('activities'), ctrl.replaceAssignments);
+router.delete('/:id', requirePermission('activities'), ctrl.remove);
 
 // Rutas para planeaciones (schedules)
-router.get('/:activityId/schedules', ctrl.getSchedules);
-router.post('/:activityId/schedules', ctrl.createSchedule);
+router.get('/:activityId/schedules', requirePermission('schedules'), ctrl.getSchedules);
+router.post('/:activityId/schedules', requirePermission('schedules'), ctrl.createSchedule);
 // Rutas específicas deben ir antes de las genéricas
-router.post('/:activityId/schedules/bulk', ctrl.bulkCreateSchedules);
-router.get('/:activityId/schedules/available', ctrl.getAvailableSchedulesByDate);
+router.post('/:activityId/schedules/bulk', requirePermission('schedules'), ctrl.bulkCreateSchedules);
+router.get('/:activityId/schedules/available', requirePermission('schedules'), ctrl.getAvailableSchedulesByDate);
 // Ruta para consultar disponibilidad
-router.get('/schedules/availability', ctrl.getScheduleAvailability);
+router.get('/schedules/availability', requirePermission('schedules'), ctrl.getScheduleAvailability);
 
 // Rutas genéricas (IDs) deben ir después de las específicas
-router.get('/schedules/:scheduleId', ctrl.getScheduleById);
-router.put('/schedules/:scheduleId', ctrl.updateSchedule);
-router.put('/schedules/:scheduleId/toggle-status', ctrl.toggleScheduleStatus);
-router.delete('/schedules/:scheduleId', ctrl.deleteSchedule);
+router.get('/schedules/:scheduleId', requirePermission('schedules'), ctrl.getScheduleById);
+router.put('/schedules/:scheduleId', requirePermission('schedules'), ctrl.updateSchedule);
+router.put('/schedules/:scheduleId/toggle-status', requirePermission('schedules'), ctrl.toggleScheduleStatus);
+router.delete('/schedules/:scheduleId', requirePermission('schedules'), ctrl.deleteSchedule);
 // Ruta para agregar asistentes
-router.post('/schedules/:scheduleId/attendees', ctrl.addAttendeesToSchedule);
+router.post('/schedules/:scheduleId/attendees', requirePermission('schedules'), ctrl.addAttendeesToSchedule);
 
 module.exports = router;

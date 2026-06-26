@@ -1,13 +1,16 @@
 const { Router } = require('express');
 const ctrl = require('../controllers/roles.controller');
+const { verifyToken, requirePermission } = require('../middlewares/auth.middleware');
 
 const router = Router();
 
-router.get('/select', ctrl.listForSelect);
-router.get('/', ctrl.list);
-router.get('/:id', ctrl.getById);
-router.post('/', ctrl.create);
-router.put('/:id', ctrl.update);
-router.delete('/:id', ctrl.remove);
+router.use(verifyToken);
+
+router.get('/select', requirePermission('roles'), ctrl.listForSelect);
+router.get('/', requirePermission('roles'), ctrl.list);
+router.get('/:id', requirePermission('roles'), ctrl.getById);
+router.post('/', requirePermission('roles'), ctrl.create);
+router.put('/:id', requirePermission('roles'), ctrl.update);
+router.delete('/:id', requirePermission('roles'), ctrl.remove);
 
 module.exports = router;

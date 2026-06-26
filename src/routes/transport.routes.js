@@ -1,14 +1,17 @@
 const { Router } = require('express');
 const ctrl = require('../controllers/transport.controller');
+const { verifyToken, requirePermission } = require('../middlewares/auth.middleware');
 
 const router = Router();
 
-router.get('/available', ctrl.listAvailable);
-router.get('/', ctrl.list);
-router.get('/:id', ctrl.getById);
-router.post('/', ctrl.create);
-router.put('/:id', ctrl.update);
-router.delete('/:id', ctrl.remove);
+router.use(verifyToken);
+
+router.get('/available', requirePermission('transports'), ctrl.listAvailable);
+router.get('/', requirePermission('transports'), ctrl.list);
+router.get('/:id', requirePermission('transports'), ctrl.getById);
+router.post('/', requirePermission('transports'), ctrl.create);
+router.put('/:id', requirePermission('transports'), ctrl.update);
+router.delete('/:id', requirePermission('transports'), ctrl.remove);
 
 module.exports = router;
 
