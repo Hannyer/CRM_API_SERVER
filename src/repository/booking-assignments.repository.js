@@ -178,9 +178,9 @@ async function listScheduleGuideAssignments() {
       ) as guides
     FROM ops.activity_schedule s
     JOIN ops.activity a ON a.id = s.activity_id
-    JOIN ops.activity_schedule_guide asg ON asg.activity_schedule_id = s.id
-    JOIN ops.app_user u ON u.id = asg.guide_id
-    LEFT JOIN (
+    LEFT JOIN ops.activity_schedule_guide asg ON asg.activity_schedule_id = s.id
+    LEFT JOIN ops.app_user u ON u.id = asg.guide_id
+    JOIN (
       SELECT
         activity_schedule_id,
         COUNT(*)::int as booking_count,
@@ -189,6 +189,8 @@ async function listScheduleGuideAssignments() {
       WHERE status IN ('pending', 'confirmed')
       GROUP BY activity_schedule_id
     ) b ON b.activity_schedule_id = s.id
+    WHERE s.scheduled_start::date >= CURRENT_DATE
+      AND s.status = true
     GROUP BY s.id, a.id, a.title, s.scheduled_start, s.scheduled_end, b.booking_count, b.total_people
     ORDER BY s.scheduled_start ASC
     `
@@ -224,6 +226,37 @@ async function setScheduleGuides(activityScheduleId, guideIds = []) {
   } finally {
     client.release();
   }
+}
+
+async function listBookingTransportAssignments() {
+  const { rows } = await pool.query(
+    `
+    SELECT
+      b.id as "bookingId",
+      b.customer_name as "customerName",
+      b.number_of_people as "numberOfPeople",
+      b.status,
+      a.title as "activityTitle",
+      s.scheduled_start as "scheduledStart",
+      s.scheduled_end as "scheduledEnd",
+      bt.id as "assignmentId",
+      t.id as "transportId",
+      t.model,
+      t.capacity,
+      t.license_plate as "licensePlate",
+      t.operational_status as "operationalStatus",
+      bt.created_at as "assignedAt"
+    FROM ops.booking b
+    JOIN ops.activity_schedule s ON s.id = b.activity_schedule_id
+    JOIN ops.activity a ON a.id = s.activity_id
+    JOIN ops.booking_transport bt ON bt.booking_id = b.id
+    JOIN ops.transport t ON t.id = bt.transport_id
+    WHERE b.transport = true
+      AND b.status IN ('pending', 'confirmed')
+    ORDER BY s.scheduled_start ASC, b.customer_name ASC
+    `
+  );
+  return rows;
 }
 
 /**
@@ -334,6 +367,7 @@ module.exports = {
   getAvailableGuides,
   getAvailableGuidesByScheduleId,
   listScheduleGuideAssignments,
+  listBookingTransportAssignments,
   setBookingGuides,
   setScheduleGuides,
   setBookingTransport,

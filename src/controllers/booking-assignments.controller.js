@@ -67,6 +67,16 @@ async function assignScheduleGuides(req, res) {
   }
 }
 
+async function listBookingTransportAssignments(req, res) {
+  try {
+    const assignments = await assignmentsService.listBookingTransportAssignments();
+    res.json(assignments);
+  } catch (e) {
+    console.error(e);
+    sendErrorResponse(res, e, 500, 'Error al obtener reservaciones con transporte asignado');
+  }
+}
+
 /**
  * @openapi
  * /api/booking-assignments/{bookingId}:
@@ -257,6 +267,7 @@ module.exports = {
   listScheduleGuideAssignments,
   getAvailableGuidesBySchedule,
   assignScheduleGuides,
+  listBookingTransportAssignments,
   getAssignments,
   assignGuides,
   assignTransport,

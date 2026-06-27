@@ -61,6 +61,10 @@ async function assignScheduleGuides(activityScheduleId, guideIds = []) {
   return assignmentsRepo.listScheduleGuideAssignments();
 }
 
+async function listBookingTransportAssignments() {
+  return assignmentsRepo.listBookingTransportAssignments();
+}
+
 /**
  * Asigna guías a una reserva
  * - Máximo 5 guías por reserva
@@ -197,6 +201,7 @@ module.exports = {
   listScheduleGuideAssignments,
   getAvailableGuidesByScheduleId,
   assignScheduleGuides,
+  listBookingTransportAssignments,
   assignGuides,
   assignTransport,
   confirmBooking,
