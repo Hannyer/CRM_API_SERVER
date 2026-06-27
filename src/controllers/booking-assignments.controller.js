@@ -18,11 +18,52 @@ const { sendErrorResponse } = require('../utils/errorHandler');
  */
 async function getAvailableGuides(req, res) {
   try {
-    const guides = await assignmentsService.getAvailableGuides();
+    const guides = await assignmentsService.getAvailableGuides(req.query.bookingId || null);
     res.json(guides);
   } catch (e) {
     console.error(e);
     sendErrorResponse(res, e, 500, 'Error al obtener guías disponibles');
+  }
+}
+
+async function listScheduleGuideAssignments(req, res) {
+  try {
+    const assignments = await assignmentsService.listScheduleGuideAssignments();
+    res.json(assignments);
+  } catch (e) {
+    console.error(e);
+    sendErrorResponse(res, e, 500, 'Error al obtener salidas con guías asignados');
+  }
+}
+
+async function getAvailableGuidesBySchedule(req, res) {
+  try {
+    const { activityScheduleId } = req.params;
+    const guides = await assignmentsService.getAvailableGuidesByScheduleId(activityScheduleId);
+    res.json(guides);
+  } catch (e) {
+    console.error(e);
+    sendErrorResponse(res, e, 500, 'Error al obtener guías disponibles para la salida');
+  }
+}
+
+async function assignScheduleGuides(req, res) {
+  try {
+    const { activityScheduleId } = req.params;
+    const { guideIds = [] } = req.body;
+
+    if (!Array.isArray(guideIds)) {
+      return res.status(400).json({ message: 'guideIds debe ser un array' });
+    }
+
+    const result = await assignmentsService.assignScheduleGuides(activityScheduleId, guideIds);
+    res.json(result);
+  } catch (e) {
+    console.error(e);
+    if (e instanceof AppError) {
+      return res.status(e.status).json({ message: e.message, code: e.code });
+    }
+    sendErrorResponse(res, e, 500, 'Error al asignar guías a la salida');
   }
 }
 
@@ -213,6 +254,9 @@ async function confirmBooking(req, res) {
 
 module.exports = {
   getAvailableGuides,
+  listScheduleGuideAssignments,
+  getAvailableGuidesBySchedule,
+  assignScheduleGuides,
   getAssignments,
   assignGuides,
   assignTransport,

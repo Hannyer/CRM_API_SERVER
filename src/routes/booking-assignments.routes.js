@@ -10,6 +10,11 @@ router.use(verifyToken);
 // Obtener guías disponibles para asignar
 router.get('/guides/available', requirePermission('operator'), ctrl.getAvailableGuides);
 
+// Submódulo de salidas con guías asignados
+router.get('/schedules/guides', requirePermission('operator'), ctrl.listScheduleGuideAssignments);
+router.get('/schedules/:activityScheduleId/guides/available', requirePermission('operator'), ctrl.getAvailableGuidesBySchedule);
+router.put('/schedules/:activityScheduleId/guides', requirePermission('operator'), ctrl.assignScheduleGuides);
+
 // Obtener asignaciones actuales de una reserva
 router.get('/:bookingId', requirePermission('operator'), ctrl.getAssignments);
 
@@ -23,4 +28,3 @@ router.put('/:bookingId/transport', requirePermission('operator'), ctrl.assignTr
 router.put('/:bookingId/confirm', requirePermission('operator'), ctrl.confirmBooking);
 
 module.exports = router;
-

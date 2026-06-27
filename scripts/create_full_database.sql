@@ -168,6 +168,19 @@ CREATE INDEX IF NOT EXISTS idx_activity_schedule_capacity
 CREATE INDEX IF NOT EXISTS idx_activity_schedule_availability 
     ON ops.activity_schedule(activity_id, scheduled_start, capacity, booked_count) WHERE status = true;
 
+-- 3.2.1 Guías asignados a una salida/horario
+CREATE TABLE IF NOT EXISTS ops.activity_schedule_guide (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    activity_schedule_id UUID NOT NULL REFERENCES ops.activity_schedule(id) ON DELETE CASCADE,
+    guide_id UUID NOT NULL REFERENCES ops.app_user(id) ON DELETE RESTRICT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (activity_schedule_id, guide_id)
+);
+CREATE INDEX IF NOT EXISTS idx_activity_schedule_guide_schedule_id
+    ON ops.activity_schedule_guide(activity_schedule_id);
+CREATE INDEX IF NOT EXISTS idx_activity_schedule_guide_guide_id
+    ON ops.activity_schedule_guide(guide_id);
+
 -- 3.3 Idiomas asignados a actividad
 CREATE TABLE IF NOT EXISTS ops.activity_language (
     activity_id UUID NOT NULL REFERENCES ops.activity(id) ON DELETE CASCADE,
