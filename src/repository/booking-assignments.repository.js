@@ -1,5 +1,6 @@
 // src/repository/booking-assignments.repository.js
 const { pool } = require('../config/db.pg');
+const { ROLE_IDS } = require('../constants/roleIds');
 
 // UUID del rol "Guía" en ops.role
 const GUIDE_ROLE_ID = '9d3372fa-7180-4f04-9727-374e9b513d53';
@@ -38,9 +39,14 @@ async function getAssignmentsByBookingId(bookingId) {
       t.capacity,
       t.license_plate as "licensePlate",
       t.operational_status as "operationalStatus",
-      bt.created_at as "assignedAt"
+      bt.created_at as "assignedAt",
+      d.id as "driverId",
+      d.full_name as "driverName",
+      d.email as "driverEmail",
+      d.phone as "driverPhone"
     FROM ops.booking_transport bt
     JOIN ops.transport t ON t.id = bt.transport_id
+    LEFT JOIN ops.app_user d ON d.id = bt.driver_id
     WHERE bt.booking_id = $1::uuid
     `,
     [bookingId]
@@ -101,6 +107,20 @@ async function getAvailableGuides(bookingId = null) {
     ORDER BY u.full_name ASC
     `,
     [GUIDE_ROLE_ID, bookingId]
+  );
+  return rows;
+}
+
+async function getAvailableDrivers() {
+  const { rows } = await pool.query(
+    `
+    SELECT id, full_name as "fullName", email, phone, status
+    FROM ops.app_user
+    WHERE role_id = $1::uuid
+      AND status = true
+    ORDER BY full_name ASC
+    `,
+    [ROLE_IDS.CONDUCTOR]
   );
   return rows;
 }
@@ -245,12 +265,17 @@ async function listBookingTransportAssignments() {
       t.capacity,
       t.license_plate as "licensePlate",
       t.operational_status as "operationalStatus",
-      bt.created_at as "assignedAt"
+      bt.created_at as "assignedAt",
+      d.id as "driverId",
+      d.full_name as "driverName",
+      d.email as "driverEmail",
+      d.phone as "driverPhone"
     FROM ops.booking b
     JOIN ops.activity_schedule s ON s.id = b.activity_schedule_id
     JOIN ops.activity a ON a.id = s.activity_id
     JOIN ops.booking_transport bt ON bt.booking_id = b.id
     JOIN ops.transport t ON t.id = bt.transport_id
+    LEFT JOIN ops.app_user d ON d.id = bt.driver_id
     WHERE b.transport = true
       AND b.status IN ('pending', 'confirmed')
     ORDER BY s.scheduled_start ASC, b.customer_name ASC
@@ -309,7 +334,7 @@ async function setBookingGuides(bookingId, guideIds = []) {
 /**
  * Asigna un transporte a una reserva. Si transportId es null, elimina la asignación.
  */
-async function setBookingTransport(bookingId, transportId) {
+async function setBookingTransport(bookingId, transportId, driverId = null) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -324,11 +349,11 @@ async function setBookingTransport(bookingId, transportId) {
     if (transportId) {
       await client.query(
         `
-        INSERT INTO ops.booking_transport (booking_id, transport_id)
-        VALUES ($1::uuid, $2::uuid)
+        INSERT INTO ops.booking_transport (booking_id, transport_id, driver_id)
+        VALUES ($1::uuid, $2::uuid, $3::uuid)
         ON CONFLICT DO NOTHING
         `,
-        [bookingId, transportId]
+        [bookingId, transportId, driverId]
       );
     }
 
@@ -340,6 +365,66 @@ async function setBookingTransport(bookingId, transportId) {
   } finally {
     client.release();
   }
+}
+
+async function listGuideAssignmentsByUser(userId) {
+  const { rows } = await pool.query(
+    `
+    SELECT
+      s.id as "activityScheduleId",
+      a.title as "activityTitle",
+      s.scheduled_start as "scheduledStart",
+      s.scheduled_end as "scheduledEnd",
+      COALESCE(b.booking_count, 0)::int as "bookingCount",
+      COALESCE(b.total_people, 0)::int as "totalPeople"
+    FROM ops.activity_schedule_guide asg
+    JOIN ops.activity_schedule s ON s.id = asg.activity_schedule_id
+    JOIN ops.activity a ON a.id = s.activity_id
+    LEFT JOIN (
+      SELECT activity_schedule_id, COUNT(*) as booking_count, SUM(number_of_people) as total_people
+      FROM ops.booking
+      WHERE status IN ('pending', 'confirmed')
+      GROUP BY activity_schedule_id
+    ) b ON b.activity_schedule_id = s.id
+    WHERE asg.guide_id = $1::uuid
+      AND s.scheduled_start::date >= CURRENT_DATE
+      AND s.status = true
+    ORDER BY s.scheduled_start ASC
+    `,
+    [userId]
+  );
+  return rows;
+}
+
+async function listDriverAssignmentsByUser(userId) {
+  const { rows } = await pool.query(
+    `
+    SELECT
+      b.id as "bookingId",
+      b.customer_name as "customerName",
+      b.customer_phone as "customerPhone",
+      b.number_of_people as "numberOfPeople",
+      b.status,
+      a.title as "activityTitle",
+      s.scheduled_start as "scheduledStart",
+      s.scheduled_end as "scheduledEnd",
+      t.id as "transportId",
+      t.model,
+      t.capacity,
+      t.license_plate as "licensePlate"
+    FROM ops.booking_transport bt
+    JOIN ops.booking b ON b.id = bt.booking_id
+    JOIN ops.activity_schedule s ON s.id = b.activity_schedule_id
+    JOIN ops.activity a ON a.id = s.activity_id
+    JOIN ops.transport t ON t.id = bt.transport_id
+    WHERE bt.driver_id = $1::uuid
+      AND b.status IN ('pending', 'confirmed')
+      AND s.scheduled_start::date >= CURRENT_DATE
+    ORDER BY s.scheduled_start ASC
+    `,
+    [userId]
+  );
+  return rows;
 }
 
 /**
@@ -365,11 +450,14 @@ async function confirmBooking(bookingId) {
 module.exports = {
   getAssignmentsByBookingId,
   getAvailableGuides,
+  getAvailableDrivers,
   getAvailableGuidesByScheduleId,
   listScheduleGuideAssignments,
   listBookingTransportAssignments,
   setBookingGuides,
   setScheduleGuides,
   setBookingTransport,
+  listGuideAssignmentsByUser,
+  listDriverAssignmentsByUser,
   confirmBooking,
 };

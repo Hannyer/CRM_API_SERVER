@@ -24,6 +24,10 @@ async function getAvailableGuides(bookingId = null) {
   return assignmentsRepo.getAvailableGuides(bookingId);
 }
 
+async function getAvailableDrivers() {
+  return assignmentsRepo.getAvailableDrivers();
+}
+
 async function listScheduleGuideAssignments() {
   return assignmentsRepo.listScheduleGuideAssignments();
 }
@@ -114,7 +118,7 @@ async function assignGuides(bookingId, guideIds = []) {
  * - El transporte debe estar operacional
  * - La reserva debe tener transport = true
  */
-async function assignTransport(bookingId, transportId) {
+async function assignTransport(bookingId, transportId, driverId = null) {
   // Validar reserva
   const booking = await bookingsRepo.getBookingById(bookingId);
   if (!booking) {
@@ -141,7 +145,15 @@ async function assignTransport(bookingId, transportId) {
     }
   }
 
-  return assignmentsRepo.setBookingTransport(bookingId, transportId || null);
+  return assignmentsRepo.setBookingTransport(bookingId, transportId || null, driverId || null);
+}
+
+async function listMyGuideAssignments(userId) {
+  return assignmentsRepo.listGuideAssignmentsByUser(userId);
+}
+
+async function listMyDriverAssignments(userId) {
+  return assignmentsRepo.listDriverAssignmentsByUser(userId);
 }
 
 /**
@@ -198,11 +210,14 @@ async function confirmBooking(bookingId) {
 module.exports = {
   getAssignments,
   getAvailableGuides,
+  getAvailableDrivers,
   listScheduleGuideAssignments,
   getAvailableGuidesByScheduleId,
   assignScheduleGuides,
   listBookingTransportAssignments,
   assignGuides,
   assignTransport,
+  listMyGuideAssignments,
+  listMyDriverAssignments,
   confirmBooking,
 };

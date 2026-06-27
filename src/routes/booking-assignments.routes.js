@@ -9,6 +9,11 @@ router.use(verifyToken);
 
 // Obtener guías disponibles para asignar
 router.get('/guides/available', requirePermission('operator'), ctrl.getAvailableGuides);
+router.get('/drivers/available', requirePermission('operator'), ctrl.getAvailableDrivers);
+
+// Módulos personales para guías y conductores
+router.get('/me/guide', ctrl.listMyGuideAssignments);
+router.get('/me/driver', ctrl.listMyDriverAssignments);
 
 // Submódulo de salidas con guías asignados
 router.get('/schedules/guides', requirePermission('operator'), ctrl.listScheduleGuideAssignments);

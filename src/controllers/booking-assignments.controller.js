@@ -26,6 +26,16 @@ async function getAvailableGuides(req, res) {
   }
 }
 
+async function getAvailableDrivers(req, res) {
+  try {
+    const drivers = await assignmentsService.getAvailableDrivers();
+    res.json(drivers);
+  } catch (e) {
+    console.error(e);
+    sendErrorResponse(res, e, 500, 'Error al obtener conductores disponibles');
+  }
+}
+
 async function listScheduleGuideAssignments(req, res) {
   try {
     const assignments = await assignmentsService.listScheduleGuideAssignments();
@@ -211,9 +221,9 @@ async function assignGuides(req, res) {
 async function assignTransport(req, res) {
   try {
     const { bookingId } = req.params;
-    const { transportId = null } = req.body;
+    const { transportId = null, driverId = null } = req.body;
 
-    const result = await assignmentsService.assignTransport(bookingId, transportId);
+    const result = await assignmentsService.assignTransport(bookingId, transportId, driverId);
     res.json(result);
   } catch (e) {
     console.error(e);
@@ -221,6 +231,26 @@ async function assignTransport(req, res) {
       return res.status(e.status).json({ message: e.message, code: e.code });
     }
     sendErrorResponse(res, e, 500, 'Error al asignar transporte');
+  }
+}
+
+async function listMyGuideAssignments(req, res) {
+  try {
+    const assignments = await assignmentsService.listMyGuideAssignments(req.user.id);
+    res.json(assignments);
+  } catch (e) {
+    console.error(e);
+    sendErrorResponse(res, e, 500, 'Error al obtener actividades asignadas al guía');
+  }
+}
+
+async function listMyDriverAssignments(req, res) {
+  try {
+    const assignments = await assignmentsService.listMyDriverAssignments(req.user.id);
+    res.json(assignments);
+  } catch (e) {
+    console.error(e);
+    sendErrorResponse(res, e, 500, 'Error al obtener reservaciones asignadas al conductor');
   }
 }
 
@@ -264,10 +294,13 @@ async function confirmBooking(req, res) {
 
 module.exports = {
   getAvailableGuides,
+  getAvailableDrivers,
   listScheduleGuideAssignments,
   getAvailableGuidesBySchedule,
   assignScheduleGuides,
   listBookingTransportAssignments,
+  listMyGuideAssignments,
+  listMyDriverAssignments,
   getAssignments,
   assignGuides,
   assignTransport,
