@@ -33,10 +33,45 @@ async function listScheduleGuideAssignments() {
 }
 
 async function getAvailableGuidesByScheduleId(activityScheduleId) {
-  return assignmentsRepo.getAvailableGuidesByScheduleId(activityScheduleId);
+  const guides = await assignmentsRepo.getAvailableGuidesByScheduleId(activityScheduleId);
+  if (guides === null) {
+    throw new AppError('Salida de actividad no encontrada', 404);
+  }
+  return guides;
+}
+
+function assertGuidesSelectableForSchedule(guides, guideIds) {
+  const unavailable = guideIds
+    .map((guideId) => guides.find((guide) => guide.id === guideId))
+    .filter((guide) => !guide || !guide.isAvailable);
+
+  if (unavailable.length === 0) {
+    return;
+  }
+
+  const details = unavailable
+    .map((guide) => {
+      if (!guide) return 'un guía desconocido';
+      if (guide.scheduleConflict?.activityTitle) {
+        return `${guide.fullName} (ocupado en "${guide.scheduleConflict.activityTitle}")`;
+      }
+      return guide.fullName;
+    })
+    .join(', ');
+
+  throw new AppError(
+    `Solo puedes asignar guías disponibles sin cruce de horario. No disponibles: ${details}`,
+    400,
+    'GUIDE_SCHEDULE_CONFLICT'
+  );
 }
 
 async function assignScheduleGuides(activityScheduleId, guideIds = []) {
+  const scheduleExists = await assignmentsRepo.activityScheduleExists(activityScheduleId);
+  if (!scheduleExists) {
+    throw new AppError('Salida de actividad no encontrada', 404);
+  }
+
   if (guideIds.length > MAX_GUIDES_PER_BOOKING) {
     throw new AppError(
       `Se puede asignar un máximo de ${MAX_GUIDES_PER_BOOKING} guías por salida`,
@@ -50,15 +85,8 @@ async function assignScheduleGuides(activityScheduleId, guideIds = []) {
   }
 
   if (uniqueIds.length > 0) {
-    const availableGuides = await assignmentsRepo.getAvailableGuidesByScheduleId(activityScheduleId);
-    const availableIds = new Set(availableGuides.map((guide) => guide.id));
-    const unavailableIds = uniqueIds.filter((guideId) => !availableIds.has(guideId));
-    if (unavailableIds.length > 0) {
-      throw new AppError(
-        'Uno o más guías seleccionados ya tienen una actividad asignada en ese horario',
-        400
-      );
-    }
+    const guides = await assignmentsRepo.getGuidesWithScheduleAvailability(activityScheduleId);
+    assertGuidesSelectableForSchedule(guides, uniqueIds);
   }
 
   await assignmentsRepo.setScheduleGuides(activityScheduleId, uniqueIds);
@@ -98,16 +126,11 @@ async function assignGuides(bookingId, guideIds = []) {
     throw new AppError('La lista de guías contiene IDs duplicados', 400);
   }
 
-  if (uniqueIds.length > 0) {
-    const availableGuides = await assignmentsRepo.getAvailableGuides(bookingId);
-    const availableIds = new Set(availableGuides.map((guide) => guide.id));
-    const unavailableIds = uniqueIds.filter((guideId) => !availableIds.has(guideId));
-    if (unavailableIds.length > 0) {
-      throw new AppError(
-        'Uno o más guías seleccionados ya tienen una actividad asignada en ese horario',
-        400
-      );
-    }
+  if (uniqueIds.length > 0 && booking.activityScheduleId) {
+    const guides = await assignmentsRepo.getGuidesWithScheduleAvailability(
+      booking.activityScheduleId
+    );
+    assertGuidesSelectableForSchedule(guides, uniqueIds);
   }
 
   return assignmentsRepo.setBookingGuides(bookingId, uniqueIds);

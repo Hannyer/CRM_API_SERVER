@@ -15,6 +15,7 @@ const rolesRoutes = require('./roles.routes');
 const menuRoutes = require('./menu.routes');
 const securityRoutes = require('./security.routes');
 const bookingAssignmentsRoutes = require('./booking-assignments.routes');
+const referencePointsRoutes = require('./reference-points.routes');
 
 const router = Router();
  
@@ -34,6 +35,7 @@ router.use('/roles', rolesRoutes);
 router.use('/menu', menuRoutes);
 router.use('/security', securityRoutes);
 router.use('/booking-assignments', bookingAssignmentsRoutes);
+router.use('/reference-points', referencePointsRoutes);
 
 
 module.exports = router;
