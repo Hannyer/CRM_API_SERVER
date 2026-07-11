@@ -1,4 +1,4 @@
--- Migración: ampliar ops.app_user (cédula, teléfono, licencia, inglés, enum de roles)
+-- Migración: ampliar ops.app_user (cédula, teléfono, inglés, enum de roles)
 -- Ejecutar sobre bases que ya tienen ops.app_user con role TEXT
 
 -- 1. Enum de roles (inglés)
@@ -19,7 +19,6 @@ END $$;
 ALTER TABLE ops.app_user
     ADD COLUMN IF NOT EXISTS cedula VARCHAR(20),
     ADD COLUMN IF NOT EXISTS phone VARCHAR(30),
-    ADD COLUMN IF NOT EXISTS license_expiration_date DATE,
     ADD COLUMN IF NOT EXISTS speaks_english BOOLEAN NOT NULL DEFAULT false;
 
 -- 3. Migrar rol legacy operador -> operator
@@ -44,7 +43,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_app_user_cedula_unique
 
 COMMENT ON COLUMN ops.app_user.cedula IS 'Cédula del usuario (obligatorio, única)';
 COMMENT ON COLUMN ops.app_user.phone IS 'Teléfono (obligatorio)';
-COMMENT ON COLUMN ops.app_user.license_expiration_date IS 'Vencimiento licencia (obligatorio si role = driver)';
 COMMENT ON COLUMN ops.app_user.speaks_english IS 'Indica si habla inglés';
 COMMENT ON COLUMN ops.app_user.role IS 'Rol: admin | driver | receptionist | operator | guide';
 

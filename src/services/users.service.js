@@ -1,5 +1,6 @@
 const usersRepo = require('../repository/user.repository');
 const userLanguagesRepo = require('../repository/user-languages.repository');
+const userLicensesRepo = require('../repository/user-licenses.repository');
 const rolesService = require('./roles.service');
 const { AppError } = require('../utils/AppError');
 const { isConductorRole, isGuiaRole } = require('../constants/roleIds');
@@ -44,21 +45,49 @@ function validateUserId(userId) {
   }
 }
 
-function validateLicenseExpirationDateFormat(licenseExpirationDate) {
-  if (
-    licenseExpirationDate !== undefined &&
-    licenseExpirationDate !== null &&
-    licenseExpirationDate !== ''
-  ) {
-    if (typeof licenseExpirationDate !== 'string' || !DATE_REGEX.test(licenseExpirationDate)) {
-      throw new AppError('licenseExpirationDate debe tener formato YYYY-MM-DD', 400);
-    }
-  }
-}
-
 function validateSpeaksEnglish(value) {
   if (value !== undefined && typeof value !== 'boolean') {
     throw new AppError('speaksEnglish debe ser un valor booleano', 400);
+  }
+}
+
+function normalizeLicenses(licenses) {
+  if (licenses === undefined || licenses === null) return [];
+  if (!Array.isArray(licenses)) {
+    throw new AppError('licenses debe ser un arreglo', 400, 'INVALID_LICENSES');
+  }
+
+  const seen = new Set();
+  const normalized = [];
+
+  for (const item of licenses) {
+    const licenseTypeId = String(item?.licenseTypeId ?? item?.license_type_id ?? '').trim();
+    const expirationDate = String(item?.expirationDate ?? item?.expiration_date ?? '').trim();
+
+    if (!UUID_REGEX.test(licenseTypeId)) {
+      throw new AppError(`licenseTypeId inválido: ${licenseTypeId}`, 400, 'INVALID_LICENSES');
+    }
+    if (!DATE_REGEX.test(expirationDate)) {
+      throw new AppError('expirationDate debe tener formato YYYY-MM-DD', 400, 'INVALID_LICENSES');
+    }
+    if (seen.has(licenseTypeId)) continue;
+    seen.add(licenseTypeId);
+    normalized.push({ licenseTypeId, expirationDate });
+  }
+
+  return normalized;
+}
+
+async function assertLicensesExist(licenses) {
+  if (!licenses.length) return;
+  const ids = licenses.map((item) => item.licenseTypeId);
+  const found = await userLicensesRepo.countActiveLicenseTypesByIds(ids);
+  if (found !== ids.length) {
+    throw new AppError(
+      'Uno o más licenseTypeId no existen o están inactivos en ops.license_type',
+      400,
+      'INVALID_LICENSES'
+    );
   }
 }
 
@@ -145,17 +174,37 @@ async function assertValidRoleId(roleId) {
   await rolesService.assertActiveRoleId(roleId);
 }
 
-async function assertDriverLicenseDate(roleId, licenseExpirationDate) {
+async function roleRequiresUserLicenses(roleId) {
   const requiresLicense = await rolesService.roleRequiresLicense(roleId);
-  if (requiresLicense && !licenseExpirationDate) {
+  const requiresLanguages = await rolesService.roleRequiresLanguages(roleId);
+  return requiresLicense || requiresLanguages;
+}
+
+async function resolveLicensesForRole(roleId, licenses, { required = false } = {}) {
+  const normalized = normalizeLicenses(licenses);
+  const requiresLicenses = await roleRequiresUserLicenses(roleId);
+
+  if (!requiresLicenses) {
+    if (normalized.length > 0) {
+      throw new AppError(
+        'licenses solo aplica para usuarios con rol Guía o Conductor',
+        400,
+        'USER_LICENSES_NOT_ALLOWED'
+      );
+    }
+    return [];
+  }
+
+  if (required && normalized.length === 0) {
     throw new AppError(
-      isConductorRole(roleId)
-        ? 'licenseExpirationDate es obligatorio para el rol Conductor'
-        : 'licenseExpirationDate es obligatorio para el rol seleccionado',
+      'licenses es obligatorio para usuarios Guía o Conductor (al menos una licencia)',
       400,
-      'DRIVER_LICENSE_REQUIRED'
+      'USER_LICENSES_REQUIRED'
     );
   }
+
+  await assertLicensesExist(normalized);
+  return normalized;
 }
 
 async function listUsers({ page, limit, status, roleId } = {}) {
@@ -186,10 +235,10 @@ async function createUser(payload) {
     phone,
     password,
     roleId,
-    licenseExpirationDate,
     speaksEnglish,
     status,
     languageIds,
+    licenses,
   } = payload || {};
 
   validateRequiredText(cedula, 'cedula');
@@ -198,14 +247,15 @@ async function createUser(payload) {
   validateRequiredText(phone, 'phone');
   validateRequiredText(password, 'password');
   validateRoleId(roleId);
-  validateLicenseExpirationDateFormat(licenseExpirationDate);
   validateSpeaksEnglish(speaksEnglish);
   validateStatus(status);
 
   await assertValidRoleId(roleId);
-  await assertDriverLicenseDate(roleId, licenseExpirationDate);
 
   const resolvedLanguageIds = await resolveLanguageIdsForRole(roleId, languageIds, {
+    required: true,
+  });
+  const resolvedLicenses = await resolveLicensesForRole(roleId, licenses, {
     required: true,
   });
 
@@ -219,10 +269,10 @@ async function createUser(payload) {
     phone: phone.trim(),
     passwordHash: encrypt(password),
     roleId: roleId.trim(),
-    licenseExpirationDate: licenseExpirationDate || null,
     speaksEnglish: !!speaksEnglish,
     status: status !== false,
     languageIds: resolvedLanguageIds,
+    licenses: resolvedLicenses,
   });
 }
 
@@ -246,10 +296,10 @@ async function updateUser(userId, payload) {
     phone,
     password,
     roleId,
-    licenseExpirationDate,
     speaksEnglish,
     status,
     languageIds,
+    licenses,
   } = payload || {};
 
   if (cedula !== undefined) validateRequiredText(cedula, 'cedula');
@@ -257,7 +307,6 @@ async function updateUser(userId, payload) {
   if (fullName !== undefined) validateRequiredText(fullName, 'fullName');
   if (phone !== undefined) validateRequiredText(phone, 'phone');
   if (roleId !== undefined) validateRoleId(roleId);
-  validateLicenseExpirationDateFormat(licenseExpirationDate);
   validateSpeaksEnglish(speaksEnglish);
   validateStatus(status);
 
@@ -281,19 +330,10 @@ async function updateUser(userId, payload) {
     await assertValidRoleId(roleId);
     updateData.roleId = roleId.trim();
   }
-  if (licenseExpirationDate !== undefined) {
-    updateData.licenseExpirationDate = licenseExpirationDate || null;
-  }
   if (speaksEnglish !== undefined) updateData.speaksEnglish = !!speaksEnglish;
   if (status !== undefined) updateData.status = !!status;
 
   const effectiveRoleId = updateData.roleId ?? current.roleId;
-  const effectiveLicense =
-    updateData.licenseExpirationDate !== undefined
-      ? updateData.licenseExpirationDate
-      : current.licenseExpirationDate;
-
-  await assertDriverLicenseDate(effectiveRoleId, effectiveLicense);
 
   const roleChanged = updateData.roleId !== undefined && updateData.roleId !== current.roleId;
   const willRequireLanguages = await rolesService.roleRequiresLanguages(effectiveRoleId);
@@ -324,6 +364,33 @@ async function updateUser(userId, payload) {
     }
   }
 
+  const willRequireLicenses = await roleRequiresUserLicenses(effectiveRoleId);
+  if (!willRequireLicenses) {
+    updateData.clearLicenses = true;
+  } else if (licenses !== undefined) {
+    updateData.licenses = await resolveLicensesForRole(effectiveRoleId, licenses, {
+      required: true,
+    });
+  } else if (roleChanged) {
+    const existingCount = Array.isArray(current.licenses) ? current.licenses.length : 0;
+    if (existingCount === 0) {
+      throw new AppError(
+        'licenses es obligatorio al asignar rol Guía o Conductor',
+        400,
+        'USER_LICENSES_REQUIRED'
+      );
+    }
+  } else {
+    const existingCount = Array.isArray(current.licenses) ? current.licenses.length : 0;
+    if (existingCount === 0) {
+      throw new AppError(
+        'El usuario Guía o Conductor debe tener al menos una licencia (envíe licenses)',
+        400,
+        'USER_LICENSES_REQUIRED'
+      );
+    }
+  }
+
   return usersRepo.updateUser(userId, updateData);
 }
 
@@ -343,6 +410,10 @@ async function getAvailableRoles() {
   }));
 }
 
+async function listLicenseTypes() {
+  return userLicensesRepo.listActiveLicenseTypes();
+}
+
 module.exports = {
   listUsers,
   createUser,
@@ -351,4 +422,5 @@ module.exports = {
   updateUser,
   deleteUser,
   getAvailableRoles,
+  listLicenseTypes,
 };

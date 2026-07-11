@@ -27,7 +27,6 @@ const { Client } = require('pg');
     await client.query(`
       ALTER TABLE ops.app_user ADD COLUMN IF NOT EXISTS cedula VARCHAR(20);
       ALTER TABLE ops.app_user ADD COLUMN IF NOT EXISTS phone VARCHAR(30);
-      ALTER TABLE ops.app_user ADD COLUMN IF NOT EXISTS license_expiration_date DATE;
       ALTER TABLE ops.app_user ADD COLUMN IF NOT EXISTS speaks_english BOOLEAN NOT NULL DEFAULT false;
     `);
 

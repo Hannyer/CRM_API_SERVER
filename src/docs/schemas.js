@@ -146,7 +146,7 @@ module.exports = {
           requiresLicense: {
             type: 'boolean',
             example: true,
-            description: 'true para Conductor (b07fe1a3-40e2-4cb8-9fd7-ff6df2a2dba3): exige licenseExpirationDate',
+            description: 'true para roles que exigen licenses',
           },
           requiresLanguages: {
             type: 'boolean',
@@ -197,7 +197,18 @@ module.exports = {
           roleName: { type: 'string', example: 'Operador' },
           roleRequiresLicense: { type: 'boolean', example: false },
           roleRequiresLanguages: { type: 'boolean', example: false },
-          licenseExpirationDate: { type: 'string', format: 'date', nullable: true, example: '2026-12-31' },
+          licenses: {
+            type: 'array',
+            description: 'Licencias del usuario con fecha de vencimiento',
+            items: {
+              type: 'object',
+              properties: {
+                licenseTypeId: { type: 'string', format: 'uuid' },
+                licenseTypeName: { type: 'string', example: 'Licencia de conducir' },
+                expirationDate: { type: 'string', format: 'date', example: '2026-12-31' },
+              },
+            },
+          },
           speaksEnglish: { type: 'boolean', example: false },
           status: { type: 'boolean', example: true },
           languages: {
@@ -227,11 +238,17 @@ module.exports = {
           phone: { type: 'string', example: '+506 8888-8888' },
           password: { type: 'string', example: '123456' },
           roleId: { type: 'string', format: 'uuid', description: 'ID del rol. Ver GET /api/roles/select' },
-          licenseExpirationDate: {
-            type: 'string',
-            format: 'date',
-            example: '2026-12-31',
-            description: 'Obligatorio si el rol tiene requiresLicense = true',
+          licenses: {
+            type: 'array',
+            description: 'Obligatorio para roles Guía o Conductor. IDs de ops.license_type con fecha de vencimiento',
+            items: {
+              type: 'object',
+              required: ['licenseTypeId', 'expirationDate'],
+              properties: {
+                licenseTypeId: { type: 'string', format: 'uuid' },
+                expirationDate: { type: 'string', format: 'date', example: '2026-12-31' },
+              },
+            },
           },
           speaksEnglish: { type: 'boolean', example: false },
           status: { type: 'boolean', example: true },
@@ -253,7 +270,17 @@ module.exports = {
           phone: { type: 'string' },
           password: { type: 'string', description: 'Nueva contraseña (opcional)' },
           roleId: { type: 'string', format: 'uuid' },
-          licenseExpirationDate: { type: 'string', format: 'date', nullable: true },
+          licenses: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['licenseTypeId', 'expirationDate'],
+              properties: {
+                licenseTypeId: { type: 'string', format: 'uuid' },
+                expirationDate: { type: 'string', format: 'date' },
+              },
+            },
+          },
           speaksEnglish: { type: 'boolean' },
           status: { type: 'boolean' },
           languageIds: {

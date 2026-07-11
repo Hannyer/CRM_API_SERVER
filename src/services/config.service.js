@@ -20,6 +20,25 @@ async function getRolClienteValue() {
   return list?.[0]?.value ?? null;
 }
 
+async function getConfiguredRoleId(roleKey) {
+  return configRepo.getConfigurationValueByKeys({
+    key01: 'PARAMETRO',
+    key02: 'SEGURIDAD',
+    key03: 'USUARIOS',
+    key04: 'ROL',
+    key05: roleKey,
+    key06: 'ROLE_ID',
+  });
+}
+
+async function getGuiaRoleId() {
+  return getConfiguredRoleId('GUIA');
+}
+
+async function getConductorRoleId() {
+  return getConfiguredRoleId('CONDUCTOR');
+}
+
 async function listConfigurations({ page, limit } = {}) {
   return configRepo.listConfigurations({ page, limit });
 }
@@ -96,6 +115,8 @@ async function deleteConfiguration(pkConfiguration) {
 
 module.exports = { 
   getRolClienteValue,
+  getGuiaRoleId,
+  getConductorRoleId,
   listConfigurations,
   listConfigurationsByKeys,
   createConfiguration,

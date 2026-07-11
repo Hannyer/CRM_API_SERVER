@@ -118,6 +118,7 @@ async function getConfigurationsBookings(configurationId) {
 async function createBooking({
   activityScheduleId,
   companyId = null,
+  referencePointId = null,
   transport = false,
   numberOfPeople,
   adultCount = 0,
@@ -143,6 +144,7 @@ async function createBooking({
     INSERT INTO ops.booking (
       activity_schedule_id, 
       company_id, 
+      reference_point_id,
       transport, 
       number_of_people,
       adult_count,
@@ -164,11 +166,12 @@ async function createBooking({
       status,
       created_by
     )
-    VALUES ($1::uuid, $2::uuid, $3::bool, $4::int, $5::int, $6::int, $7::int, $8::int, $9::text, $10::uuid, $11::uuid, $12::numeric, $13::numeric, $14::numeric, $15::numeric, $16::bool, $17::numeric, $18, $19, $20, $21, $22::uuid)
+    VALUES ($1::uuid, $2::uuid, $3::uuid, $4::bool, $5::int, $6::int, $7::int, $8::int, $9::int, $10::text, $11::uuid, $12::uuid, $13::numeric, $14::numeric, $15::numeric, $16::numeric, $17::bool, $18::numeric, $19, $20, $21, $22, $23::uuid)
     RETURNING 
       id,
       activity_schedule_id as "activityScheduleId",
       company_id as "companyId",
+      reference_point_id as "referencePointId",
       transport,
       number_of_people as "numberOfPeople",
       adult_count as "adultCount",
@@ -195,6 +198,7 @@ async function createBooking({
   const params = [
     activityScheduleId,
     companyId,
+    referencePointId,
     transport,
     numberOfPeople,
     adultCount,
@@ -255,6 +259,8 @@ async function listBookings({ page = 1, limit = 10, status = null, activitySched
       b.id,
       b.activity_schedule_id as "activityScheduleId",
       b.company_id as "companyId",
+      b.reference_point_id as "referencePointId",
+      rp.description as "referencePointDescription",
       b.transport,
       b.number_of_people as "numberOfPeople",
       b.adult_count as "adultCount",
@@ -287,10 +293,11 @@ async function listBookings({ page = 1, limit = 10, status = null, activitySched
     JOIN ops.activity_schedule s ON s.id = b.activity_schedule_id
     JOIN ops.activity a ON a.id = s.activity_id
     LEFT JOIN ops.company c ON c.id = b.company_id
+    LEFT JOIN ops.reference_point rp ON rp.id = b.reference_point_id
     LEFT JOIN ops.payment_type pt ON pt.id = b.payment_type_id
     LEFT JOIN ops.card_type ct ON ct.id = b.card_type_id
     ${whereClause}
-    ORDER BY b.created_at DESC
+    ORDER BY s.scheduled_start ASC, b.created_at DESC
     LIMIT $${paramIndex++} OFFSET $${paramIndex}
     `,
     [...params, limit, offset]
@@ -315,6 +322,8 @@ async function getBookingById(bookingId) {
       b.id,
       b.activity_schedule_id as "activityScheduleId",
       b.company_id as "companyId",
+      b.reference_point_id as "referencePointId",
+      rp.description as "referencePointDescription",
       b.transport,
       b.number_of_people as "numberOfPeople",
       b.adult_count as "adultCount",
@@ -350,6 +359,7 @@ async function getBookingById(bookingId) {
     JOIN ops.activity_schedule s ON s.id = b.activity_schedule_id
     JOIN ops.activity a ON a.id = s.activity_id
     LEFT JOIN ops.company c ON c.id = b.company_id
+    LEFT JOIN ops.reference_point rp ON rp.id = b.reference_point_id
     LEFT JOIN ops.payment_type pt ON pt.id = b.payment_type_id
     LEFT JOIN ops.card_type ct ON ct.id = b.card_type_id
     WHERE b.id = $1::uuid
@@ -366,6 +376,7 @@ async function getBookingById(bookingId) {
 async function updateBooking(bookingId, {
   activityScheduleId,
   companyId,
+  referencePointId,
   transport,
   numberOfPeople,
   adultCount,
@@ -397,6 +408,10 @@ async function updateBooking(bookingId, {
   if (companyId !== undefined) {
     updates.push(`company_id = $${paramIndex++}::uuid`);
     params.push(companyId);
+  }
+  if (referencePointId !== undefined) {
+    updates.push(`reference_point_id = $${paramIndex++}::uuid`);
+    params.push(referencePointId);
   }
   if (transport !== undefined) {
     updates.push(`transport = $${paramIndex++}::bool`);
@@ -491,6 +506,7 @@ async function updateBooking(bookingId, {
       id,
       activity_schedule_id as "activityScheduleId",
       company_id as "companyId",
+      reference_point_id as "referencePointId",
       transport,
       number_of_people as "numberOfPeople",
       adult_count as "adultCount",

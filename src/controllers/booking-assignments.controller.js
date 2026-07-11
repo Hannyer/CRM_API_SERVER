@@ -221,9 +221,20 @@ async function assignGuides(req, res) {
 async function assignTransport(req, res) {
   try {
     const { bookingId } = req.params;
-    const { transportId = null, driverId = null } = req.body;
+    const {
+      transportId = null,
+      driverId = null,
+      referencePointId = null,
+      pickupAt = null,
+    } = req.body;
 
-    const result = await assignmentsService.assignTransport(bookingId, transportId, driverId);
+    const result = await assignmentsService.assignTransport(
+      bookingId,
+      transportId,
+      driverId,
+      referencePointId,
+      pickupAt
+    );
     res.json(result);
   } catch (e) {
     console.error(e);
@@ -236,20 +247,32 @@ async function assignTransport(req, res) {
 
 async function listMyGuideAssignments(req, res) {
   try {
-    const assignments = await assignmentsService.listMyGuideAssignments(req.user.id);
+    const assignments = await assignmentsService.listMyGuideAssignments(req.user.id, {
+      startDateTime: req.query.startDateTime,
+      endDateTime: req.query.endDateTime,
+    });
     res.json(assignments);
   } catch (e) {
     console.error(e);
+    if (e instanceof AppError) {
+      return res.status(e.status).json({ message: e.message, code: e.code });
+    }
     sendErrorResponse(res, e, 500, 'Error al obtener actividades asignadas al guía');
   }
 }
 
 async function listMyDriverAssignments(req, res) {
   try {
-    const assignments = await assignmentsService.listMyDriverAssignments(req.user.id);
+    const assignments = await assignmentsService.listMyDriverAssignments(req.user.id, {
+      startDateTime: req.query.startDateTime,
+      endDateTime: req.query.endDateTime,
+    });
     res.json(assignments);
   } catch (e) {
     console.error(e);
+    if (e instanceof AppError) {
+      return res.status(e.status).json({ message: e.message, code: e.code });
+    }
     sendErrorResponse(res, e, 500, 'Error al obtener reservaciones asignadas al conductor');
   }
 }

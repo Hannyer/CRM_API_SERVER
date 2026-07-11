@@ -150,6 +150,16 @@ async function getById(req, res) {
   }
 }
 
+async function listLicenseTypes(_req, res) {
+  try {
+    const items = await usersService.listLicenseTypes();
+    res.json(items);
+  } catch (e) {
+    console.error(e);
+    sendErrorResponse(res, e, 500, 'Error al listar tipos de licencia');
+  }
+}
+
 /**
  * @openapi
  * /api/users:
@@ -337,4 +347,4 @@ async function remove(req, res) {
   }
 }
 
-module.exports = { list, getById, create, update, remove };
+module.exports = { list, getById, listLicenseTypes, create, update, remove };

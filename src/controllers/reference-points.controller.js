@@ -53,6 +53,32 @@ async function list(req, res) {
   }
 }
 
+/**
+ * @openapi
+ * /api/reference-points/select:
+ *   get:
+ *     tags: [Reference Points]
+ *     summary: Listar puntos de referencia activos para selects
+ *     description: Devuelve puntos de referencia activos para combos de cualquier módulo autenticado. No requiere permiso del módulo reference-points.
+ *     responses:
+ *       200:
+ *         description: Lista de puntos de referencia activos
+ */
+async function select(_req, res) {
+  try {
+    const data = await referencePointsService.listReferencePoints({
+      page: 1,
+      limit: 100,
+      status: true,
+    });
+
+    res.json({ items: data.items });
+  } catch (e) {
+    console.error(e);
+    sendErrorResponse(res, e, 500, 'Error al listar puntos de referencia activos');
+  }
+}
+
 async function getById(req, res) {
   try {
     const item = await referencePointsService.getReferencePointById(req.params.id);
@@ -119,4 +145,4 @@ async function remove(req, res) {
   }
 }
 
-module.exports = { list, getById, create, update, remove };
+module.exports = { list, select, getById, create, update, remove };

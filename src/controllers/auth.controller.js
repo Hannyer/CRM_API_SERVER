@@ -81,7 +81,6 @@ async function login(req, res) {
         phone: safeUser.phone,
         roleId: safeUser.role_id,
         roleName: safeUser.role_name,
-        licenseExpirationDate: safeUser.license_expiration_date,
         speaksEnglish: safeUser.speaks_english,
         status: safeUser.status,
         isexternal: isExternal,

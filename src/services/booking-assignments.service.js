@@ -2,6 +2,7 @@
 const assignmentsRepo = require('../repository/booking-assignments.repository');
 const bookingsRepo = require('../repository/bookings.repository');
 const transportRepo = require('../repository/transport.repository');
+const referencePointsRepo = require('../repository/reference-points.repository');
 const { AppError } = require('../utils/AppError');
 
 const MAX_GUIDES_PER_BOOKING = 5;
@@ -141,7 +142,7 @@ async function assignGuides(bookingId, guideIds = []) {
  * - El transporte debe estar operacional
  * - La reserva debe tener transport = true
  */
-async function assignTransport(bookingId, transportId, driverId = null) {
+async function assignTransport(bookingId, transportId, driverId = null, referencePointId = null, pickupAt = null) {
   // Validar reserva
   const booking = await bookingsRepo.getBookingById(bookingId);
   if (!booking) {
@@ -166,17 +167,60 @@ async function assignTransport(bookingId, transportId, driverId = null) {
     if (!transport.status) {
       throw new AppError('El transporte seleccionado no está activo', 400);
     }
+
+    if (!driverId) {
+      throw new AppError('driverId es requerido cuando se asigna transporte', 400);
+    }
+
+    if (!referencePointId) {
+      throw new AppError('referencePointId es requerido cuando se asigna transporte', 400);
+    }
+
+    const referencePoint = await referencePointsRepo.getReferencePointById(referencePointId);
+    if (!referencePoint) {
+      throw new AppError('El punto de referencia especificado no existe', 404);
+    }
+    if (!referencePoint.status) {
+      throw new AppError('El punto de referencia especificado no está activo', 400);
+    }
+
+    if (!pickupAt || Number.isNaN(new Date(pickupAt).getTime())) {
+      throw new AppError('pickupAt es requerido y debe ser una fecha/hora válida', 400);
+    }
   }
 
-  return assignmentsRepo.setBookingTransport(bookingId, transportId || null, driverId || null);
+  return assignmentsRepo.setBookingTransport(
+    bookingId,
+    transportId || null,
+    driverId || null,
+    referencePointId || null,
+    pickupAt || null
+  );
 }
 
-async function listMyGuideAssignments(userId) {
-  return assignmentsRepo.listGuideAssignmentsByUser(userId);
+function normalizeDateRange({ startDateTime = null, endDateTime = null } = {}) {
+  const start = startDateTime || null;
+  const end = endDateTime || null;
+
+  if (start && Number.isNaN(new Date(start).getTime())) {
+    throw new AppError('startDateTime debe ser una fecha/hora válida', 400);
+  }
+  if (end && Number.isNaN(new Date(end).getTime())) {
+    throw new AppError('endDateTime debe ser una fecha/hora válida', 400);
+  }
+  if (start && end && new Date(start) >= new Date(end)) {
+    throw new AppError('startDateTime debe ser menor que endDateTime', 400);
+  }
+
+  return { startDateTime: start, endDateTime: end };
 }
 
-async function listMyDriverAssignments(userId) {
-  return assignmentsRepo.listDriverAssignmentsByUser(userId);
+async function listMyGuideAssignments(userId, filters = {}) {
+  return assignmentsRepo.listGuideAssignmentsByUser(userId, normalizeDateRange(filters));
+}
+
+async function listMyDriverAssignments(userId, filters = {}) {
+  return assignmentsRepo.listDriverAssignmentsByUser(userId, normalizeDateRange(filters));
 }
 
 /**
@@ -214,6 +258,18 @@ async function confirmBooking(bookingId) {
   if (booking.transport && !assignments.transport) {
     throw new AppError(
       'Esta reserva requiere transporte. Debe asignar un vehículo antes de confirmar',
+      400
+    );
+  }
+  if (booking.transport && !assignments.transport.referencePointId) {
+    throw new AppError(
+      'Esta reserva requiere punto de referencia para la recogida antes de confirmar',
+      400
+    );
+  }
+  if (booking.transport && !assignments.transport.pickupAt) {
+    throw new AppError(
+      'Esta reserva requiere fecha y hora de recogida antes de confirmar',
       400
     );
   }

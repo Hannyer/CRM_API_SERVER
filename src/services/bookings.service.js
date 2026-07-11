@@ -1,5 +1,6 @@
 const bookingsRepo = require('../repository/bookings.repository');
 const companiesRepo = require('../repository/companies.repository');
+const referencePointsRepo = require('../repository/reference-points.repository');
 const { AppError } = require('../utils/AppError');
 
 /**
@@ -30,6 +31,7 @@ async function createBooking(payload) {
   const {
     activityScheduleId,
     companyId = null,
+    referencePointId = null,
     transport = false,
     numberOfPeople,
     adultCount = 0,
@@ -112,6 +114,20 @@ async function createBooking(payload) {
     throw new AppError('El porcentaje de comisión debe estar entre 0 y 100', 400);
   }
 
+  if (transport) {
+    if (!referencePointId) {
+      throw new AppError('referencePointId es requerido cuando la reserva requiere transporte', 400);
+    }
+
+    const referencePoint = await referencePointsRepo.getReferencePointById(referencePointId);
+    if (!referencePoint) {
+      throw new AppError('El punto de referencia especificado no existe', 404);
+    }
+    if (!referencePoint.status) {
+      throw new AppError('El punto de referencia especificado no está activo', 400);
+    }
+  }
+
   // Validar passenger_count si transport es true
   if (transport && passengerCount !== null && passengerCount !== undefined) {
     if (passengerCount < 0) {
@@ -140,6 +156,7 @@ async function createBooking(payload) {
   const booking = await bookingsRepo.createBooking({
     activityScheduleId,
     companyId,
+    referencePointId: transport ? referencePointId : null,
     transport,
     numberOfPeople,
     adultCount,
@@ -186,6 +203,7 @@ async function updateBooking(bookingId, payload) {
   const {
     activityScheduleId,
     companyId,
+    referencePointId,
     transport,
     numberOfPeople,
     adultCount,
@@ -203,6 +221,30 @@ async function updateBooking(bookingId, payload) {
     customerPhone,
     status
   } = payload;
+
+  if (transport !== undefined || referencePointId !== undefined) {
+    const booking = await bookingsRepo.getBookingById(bookingId);
+    if (!booking) {
+      throw new AppError('Reserva no encontrada', 404);
+    }
+
+    const finalTransport = transport !== undefined ? transport : booking.transport;
+    const finalReferencePointId = referencePointId !== undefined ? referencePointId : booking.referencePointId;
+
+    if (finalTransport) {
+      if (!finalReferencePointId) {
+        throw new AppError('referencePointId es requerido cuando la reserva requiere transporte', 400);
+      }
+
+      const referencePoint = await referencePointsRepo.getReferencePointById(finalReferencePointId);
+      if (!referencePoint) {
+        throw new AppError('El punto de referencia especificado no existe', 404);
+      }
+      if (!referencePoint.status) {
+        throw new AppError('El punto de referencia especificado no está activo', 400);
+      }
+    }
+  }
 
   // Validar que los conteos no sean negativos si se proporcionan
   if (adultCount !== undefined && adultCount < 0) {

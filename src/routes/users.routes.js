@@ -6,6 +6,7 @@ const router = Router();
 
 router.use(verifyToken);
 
+router.get('/license-types', requirePermission('users'), ctrl.listLicenseTypes);
 router.get('/', requirePermission('users'), ctrl.list);
 router.get('/:id', requirePermission('users'), ctrl.getById);
 router.post('/', requirePermission('users'), ctrl.create);

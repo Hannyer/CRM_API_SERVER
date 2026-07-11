@@ -1,6 +1,7 @@
 const rolesRepo = require('../repository/roles.repository');
 const { AppError } = require('../utils/AppError');
 const { isConductorRole, isGuiaRole } = require('../constants/roleIds');
+const configService = require('./config.service');
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -38,12 +39,16 @@ async function assertActiveRoleId(roleId) {
 }
 
 async function roleRequiresLicense(roleId) {
+  const conductorRoleId = await configService.getConductorRoleId();
+  if (conductorRoleId && roleId?.toLowerCase() === conductorRoleId.toLowerCase()) return true;
   if (isConductorRole(roleId)) return true;
   const role = await rolesRepo.getRoleById(roleId);
   return role?.requiresLicense === true;
 }
 
 async function roleRequiresLanguages(roleId) {
+  const guiaRoleId = await configService.getGuiaRoleId();
+  if (guiaRoleId && roleId?.toLowerCase() === guiaRoleId.toLowerCase()) return true;
   if (isGuiaRole(roleId)) return true;
   const role = await rolesRepo.getRoleById(roleId);
   return role?.requiresLanguages === true;

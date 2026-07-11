@@ -111,7 +111,6 @@ CREATE TABLE IF NOT EXISTS ops.app_user (
     phone VARCHAR(30) NOT NULL,
     password_hash TEXT,
     role ops.app_user_role NOT NULL,
-    license_expiration_date DATE,
     speaks_english BOOLEAN NOT NULL DEFAULT false,
     status BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
@@ -123,6 +122,29 @@ CREATE INDEX IF NOT EXISTS idx_app_user_status ON ops.app_user(status);
 CREATE INDEX IF NOT EXISTS idx_app_user_role ON ops.app_user(role);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_app_user_cedula_unique
     ON ops.app_user (UPPER(TRIM(cedula)));
+
+-- 2.8 Catalogo de tipos de licencia y licencias por usuario
+CREATE TABLE IF NOT EXISTS ops.license_type (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL UNIQUE,
+    status BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT license_type_name_not_empty CHECK (length(trim(name)) > 0)
+);
+CREATE INDEX IF NOT EXISTS idx_license_type_status ON ops.license_type(status);
+
+CREATE TABLE IF NOT EXISTS ops.app_user_license (
+    app_user_id UUID NOT NULL REFERENCES ops.app_user(id) ON DELETE CASCADE,
+    license_type_id UUID NOT NULL REFERENCES ops.license_type(id) ON DELETE RESTRICT,
+    expiration_date DATE NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (app_user_id, license_type_id)
+);
+CREATE INDEX IF NOT EXISTS idx_app_user_license_user_id ON ops.app_user_license(app_user_id);
+CREATE INDEX IF NOT EXISTS idx_app_user_license_type_id ON ops.app_user_license(license_type_id);
+CREATE INDEX IF NOT EXISTS idx_app_user_license_expiration_date ON ops.app_user_license(expiration_date);
 
 -- ============================================================
 -- 3. Actividades y planeaciones
@@ -205,6 +227,7 @@ CREATE TABLE IF NOT EXISTS ops.booking (
     activity_schedule_id UUID NOT NULL REFERENCES ops.activity_schedule(id) ON DELETE RESTRICT,
     company_id UUID REFERENCES ops.company(id) ON DELETE SET NULL,
     transport_id UUID REFERENCES ops.transport(id) ON DELETE SET NULL,
+    reference_point_id UUID REFERENCES ops.reference_point(id) ON DELETE SET NULL,
     transport BOOLEAN NOT NULL DEFAULT false, -- coincide con repositorio (campo booleano)
     number_of_people INTEGER NOT NULL CHECK (number_of_people > 0),
     passenger_count INTEGER, -- opcional, para diferenciar adultos/niños si se requiere
@@ -225,11 +248,22 @@ CREATE TABLE IF NOT EXISTS ops.booking (
 CREATE INDEX IF NOT EXISTS idx_booking_activity_schedule_id ON ops.booking(activity_schedule_id);
 CREATE INDEX IF NOT EXISTS idx_booking_company_id ON ops.booking(company_id);
 CREATE INDEX IF NOT EXISTS idx_booking_transport_id ON ops.booking(transport_id);
+CREATE INDEX IF NOT EXISTS idx_booking_reference_point_id ON ops.booking(reference_point_id);
 CREATE INDEX IF NOT EXISTS idx_booking_status ON ops.booking(status);
 CREATE INDEX IF NOT EXISTS idx_booking_created_at ON ops.booking(created_at);
 CREATE INDEX IF NOT EXISTS idx_booking_created_by ON ops.booking(created_by);
 CREATE INDEX IF NOT EXISTS idx_booking_schedule_status 
     ON ops.booking(activity_schedule_id, status) WHERE status IN ('pending', 'confirmed');
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'booking_transport_requires_reference_point'
+    ) THEN
+        ALTER TABLE ops.booking
+            ADD CONSTRAINT booking_transport_requires_reference_point
+            CHECK (transport = false OR reference_point_id IS NOT NULL);
+    END IF;
+END $$;
 
 -- ============================================================
 -- 4.X Configuración (Migración de dbo.CONFIGURATION a ops.configuration)
@@ -372,6 +406,41 @@ INSERT INTO ops.configuration (
     'PARAMETRO', 'FUNCIONALIDAD', 'MRB', 'ROL', 'CLIENTE', 'ROLCLIENTE',
     'operator', 'Rol asignado para clientes externos', 'Rol Cliente por Defecto', true
 );
+
+INSERT INTO ops.configuration (
+    key01, key02, key03, key04, key05, key06,
+    value, description, display_name, status
+) VALUES
+  (
+    'PARAMETRO', 'SEGURIDAD', 'USUARIOS', 'ROL', 'GUIA', 'ROLE_ID',
+    '9d3372fa-7180-4f04-9727-374e9b513d53',
+    'ID del rol Guia usado por reglas de negocio',
+    'Rol Guia',
+    true
+  ),
+  (
+    'PARAMETRO', 'SEGURIDAD', 'USUARIOS', 'ROL', 'CONDUCTOR', 'ROLE_ID',
+    'b07fe1a3-40e2-4cb8-9fd7-ff6df2a2dba3',
+    'ID del rol Conductor usado por reglas de negocio',
+    'Rol Conductor',
+    true
+  );
+
+INSERT INTO ops.license_type (name, status)
+VALUES
+  ('Licencia guia local', true),
+  ('Licencia guia general', true),
+  ('Licencia especializada en naturalismo', true),
+  ('Licencia especializada en canyoning', true),
+  ('Licencia especializada en cables y cuerdas', true),
+  ('Licencia especializada en cabalgatas', true),
+  ('Licencia especializada en rafting', true),
+  ('Licencia especializada en aguas planas', true),
+  ('Curso de primeros auxilios y RCP', true),
+  ('Licencia de conducir', true)
+ON CONFLICT (name) DO UPDATE SET
+  status = true,
+  updated_at = now();
 
 -- ============================================================
 -- 5. Funciones de negocio (capacidad, solapamientos, disponibilidad)

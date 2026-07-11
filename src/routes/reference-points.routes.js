@@ -7,6 +7,7 @@ const MENU_CODE = 'reference-points';
 
 router.use(verifyToken);
 
+router.get('/select', ctrl.select);
 router.get('/', requirePermission(MENU_CODE), ctrl.list);
 router.get('/:id', requirePermission(MENU_CODE), ctrl.getById);
 router.post('/', requirePermission(MENU_CODE), ctrl.create);

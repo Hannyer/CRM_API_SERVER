@@ -1,5 +1,6 @@
 const { pool } = require('../config/db.pg');
 const { LANGUAGE_JSON_AGG } = require('./user-languages.repository');
+const { USER_LICENSE_JSON_AGG, setUserLicenses } = require('./user-licenses.repository');
 
 const USER_SELECT_FIELDS = `
   u.id,
@@ -9,12 +10,12 @@ const USER_SELECT_FIELDS = `
   u.phone,
   u.role_id as "roleId",
   r.name as "roleName",
-  u.license_expiration_date as "licenseExpirationDate",
   u.speaks_english as "speaksEnglish",
   u.status,
   u.created_at as "createdAt",
   u.updated_at as "updatedAt",
-  ${LANGUAGE_JSON_AGG}
+  ${LANGUAGE_JSON_AGG},
+  ${USER_LICENSE_JSON_AGG}
 `;
 
 const USER_FROM_JOIN = `
@@ -101,10 +102,10 @@ async function createUser({
   phone,
   passwordHash,
   roleId,
-  licenseExpirationDate = null,
   speaksEnglish = false,
   status = true,
   languageIds = [],
+  licenses = [],
 }) {
   const client = await pool.connect();
   try {
@@ -114,9 +115,9 @@ async function createUser({
       `
       INSERT INTO ops.app_user (
         cedula, email, full_name, phone, password_hash, role_id,
-        license_expiration_date, speaks_english, status
+        speaks_english, status
       )
-      VALUES ($1, $2, $3, $4, $5, $6::uuid, $7, $8, $9)
+      VALUES ($1, $2, $3, $4, $5, $6::uuid, $7, $8)
       RETURNING id;
       `,
       [
@@ -126,7 +127,6 @@ async function createUser({
         phone,
         passwordHash,
         roleId,
-        licenseExpirationDate,
         speaksEnglish,
         status,
       ]
@@ -143,6 +143,8 @@ async function createUser({
         [userId, languageIds]
       );
     }
+
+    await setUserLicenses(client, userId, licenses);
 
     await client.query('COMMIT');
     return getUserById(userId);
@@ -180,7 +182,6 @@ async function getUserByEmail(email) {
       r.name as role_name,
       r.requires_license as role_requires_license,
       r.requires_languages as role_requires_languages,
-      u.license_expiration_date,
       u.speaks_english,
       u.status,
       u.created_at
@@ -195,6 +196,7 @@ async function getUserByEmail(email) {
 
 async function updateUser(userId, data) {
   const hasLanguageUpdate = data.languageIds !== undefined || data.clearLanguages;
+  const hasLicenseUpdate = data.licenses !== undefined || data.clearLicenses;
   const updates = [];
   const params = [];
   let paramIndex = 1;
@@ -205,7 +207,6 @@ async function updateUser(userId, data) {
     ['fullName', 'full_name'],
     ['phone', 'phone'],
     ['passwordHash', 'password_hash'],
-    ['licenseExpirationDate', 'license_expiration_date'],
     ['speaksEnglish', 'speaks_english'],
     ['status', 'status'],
   ];
@@ -222,7 +223,7 @@ async function updateUser(userId, data) {
     params.push(data.roleId);
   }
 
-  if (updates.length === 0 && !hasLanguageUpdate) {
+  if (updates.length === 0 && !hasLanguageUpdate && !hasLicenseUpdate) {
     return getUserById(userId);
   }
 
@@ -265,6 +266,12 @@ async function updateUser(userId, data) {
       }
     } else if (data.clearLanguages) {
       await client.query(`DELETE FROM ops.guide_language WHERE app_user_id = $1::uuid`, [userId]);
+    }
+
+    if (data.licenses !== undefined) {
+      await setUserLicenses(client, userId, data.licenses);
+    } else if (data.clearLicenses) {
+      await setUserLicenses(client, userId, []);
     }
 
     await client.query('COMMIT');

@@ -107,6 +107,31 @@ async function listConfigurations({ page = 1, limit = 10 } = {}) {
   };
 }
 
+async function getConfigurationValueByKeys({ key01, key02, key03, key04, key05, key06 } = {}) {
+  const conditions = ['status = true'];
+  const params = [];
+
+  for (const [column, value] of Object.entries({ key01, key02, key03, key04, key05, key06 })) {
+    if (value !== undefined && value !== null) {
+      params.push(value);
+      conditions.push(`${column} = $${params.length}`);
+    }
+  }
+
+  const { rows } = await pool.query(
+    `
+    SELECT value
+    FROM ops.configuration
+    WHERE ${conditions.join(' AND ')}
+    ORDER BY updated_at DESC, created_at DESC
+    LIMIT 1
+    `,
+    params
+  );
+
+  return rows[0]?.value ?? null;
+}
+
 async function createConfiguration({
   estado = 1, // 1=true, 0=false
   description = null,
@@ -337,6 +362,7 @@ async function listConfigurationsByKeys({
 module.exports = {
   getConfigList,
   listConfigurations,
+  getConfigurationValueByKeys,
   listConfigurationsByKeys,
   createConfiguration,
   getConfigurationById,

@@ -39,6 +39,9 @@ async function getAssignmentsByBookingId(bookingId) {
       t.license_plate as "licensePlate",
       t.operational_status as "operationalStatus",
       bt.created_at as "assignedAt",
+      bt.reference_point_id as "referencePointId",
+      rp.description as "referencePointDescription",
+      bt.pickup_at as "pickupAt",
       d.id as "driverId",
       d.full_name as "driverName",
       d.email as "driverEmail",
@@ -46,6 +49,7 @@ async function getAssignmentsByBookingId(bookingId) {
     FROM ops.booking_transport bt
     JOIN ops.transport t ON t.id = bt.transport_id
     LEFT JOIN ops.app_user d ON d.id = bt.driver_id
+    LEFT JOIN ops.reference_point rp ON rp.id = bt.reference_point_id
     WHERE bt.booking_id = $1::uuid
     `,
     [bookingId]
@@ -304,6 +308,9 @@ async function listBookingTransportAssignments() {
       t.license_plate as "licensePlate",
       t.operational_status as "operationalStatus",
       bt.created_at as "assignedAt",
+      bt.reference_point_id as "referencePointId",
+      rp.description as "referencePointDescription",
+      bt.pickup_at as "pickupAt",
       d.id as "driverId",
       d.full_name as "driverName",
       d.email as "driverEmail",
@@ -314,6 +321,7 @@ async function listBookingTransportAssignments() {
     JOIN ops.booking_transport bt ON bt.booking_id = b.id
     JOIN ops.transport t ON t.id = bt.transport_id
     LEFT JOIN ops.app_user d ON d.id = bt.driver_id
+    LEFT JOIN ops.reference_point rp ON rp.id = bt.reference_point_id
     WHERE b.transport = true
       AND b.status IN ('pending', 'confirmed')
     ORDER BY s.scheduled_start ASC, b.customer_name ASC
@@ -372,7 +380,7 @@ async function setBookingGuides(bookingId, guideIds = []) {
 /**
  * Asigna un transporte a una reserva. Si transportId es null, elimina la asignación.
  */
-async function setBookingTransport(bookingId, transportId, driverId = null) {
+async function setBookingTransport(bookingId, transportId, driverId = null, referencePointId = null, pickupAt = null) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -387,11 +395,11 @@ async function setBookingTransport(bookingId, transportId, driverId = null) {
     if (transportId) {
       await client.query(
         `
-        INSERT INTO ops.booking_transport (booking_id, transport_id, driver_id)
-        VALUES ($1::uuid, $2::uuid, $3::uuid)
+        INSERT INTO ops.booking_transport (booking_id, transport_id, driver_id, reference_point_id, pickup_at)
+        VALUES ($1::uuid, $2::uuid, $3::uuid, $4::uuid, $5::timestamptz)
         ON CONFLICT DO NOTHING
         `,
-        [bookingId, transportId, driverId]
+        [bookingId, transportId, driverId, referencePointId, pickupAt]
       );
     }
 
@@ -405,7 +413,7 @@ async function setBookingTransport(bookingId, transportId, driverId = null) {
   }
 }
 
-async function listGuideAssignmentsByUser(userId) {
+async function listGuideAssignmentsByUser(userId, { startDateTime = null, endDateTime = null } = {}) {
   const { rows } = await pool.query(
     `
     SELECT
@@ -425,16 +433,17 @@ async function listGuideAssignmentsByUser(userId) {
       GROUP BY activity_schedule_id
     ) b ON b.activity_schedule_id = s.id
     WHERE asg.guide_id = $1::uuid
-      AND s.scheduled_start::date >= CURRENT_DATE
+      AND s.scheduled_start >= COALESCE($2::timestamptz, CURRENT_DATE::timestamptz)
+      AND s.scheduled_start < COALESCE($3::timestamptz, (CURRENT_DATE + INTERVAL '1 day')::timestamptz)
       AND s.status = true
     ORDER BY s.scheduled_start ASC
     `,
-    [userId]
+    [userId, startDateTime, endDateTime]
   );
   return rows;
 }
 
-async function listDriverAssignmentsByUser(userId) {
+async function listDriverAssignmentsByUser(userId, { startDateTime = null, endDateTime = null } = {}) {
   const { rows } = await pool.query(
     `
     SELECT
@@ -449,18 +458,23 @@ async function listDriverAssignmentsByUser(userId) {
       t.id as "transportId",
       t.model,
       t.capacity,
-      t.license_plate as "licensePlate"
+      t.license_plate as "licensePlate",
+      bt.reference_point_id as "referencePointId",
+      rp.description as "referencePointDescription",
+      bt.pickup_at as "pickupAt"
     FROM ops.booking_transport bt
     JOIN ops.booking b ON b.id = bt.booking_id
     JOIN ops.activity_schedule s ON s.id = b.activity_schedule_id
     JOIN ops.activity a ON a.id = s.activity_id
     JOIN ops.transport t ON t.id = bt.transport_id
+    LEFT JOIN ops.reference_point rp ON rp.id = bt.reference_point_id
     WHERE bt.driver_id = $1::uuid
       AND b.status IN ('pending', 'confirmed')
-      AND s.scheduled_start::date >= CURRENT_DATE
-    ORDER BY s.scheduled_start ASC
+      AND COALESCE(bt.pickup_at, s.scheduled_start) >= COALESCE($2::timestamptz, CURRENT_DATE::timestamptz)
+      AND COALESCE(bt.pickup_at, s.scheduled_start) < COALESCE($3::timestamptz, (CURRENT_DATE + INTERVAL '1 day')::timestamptz)
+    ORDER BY COALESCE(bt.pickup_at, s.scheduled_start) ASC
     `,
-    [userId]
+    [userId, startDateTime, endDateTime]
   );
   return rows;
 }
