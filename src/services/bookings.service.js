@@ -3,6 +3,27 @@ const companiesRepo = require('../repository/companies.repository');
 const referencePointsRepo = require('../repository/reference-points.repository');
 const { AppError } = require('../utils/AppError');
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function normalizeRequiredEmail(email) {
+  if (typeof email !== 'string' || !email.trim()) {
+    throw new AppError('customerEmail es requerido', 400);
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!EMAIL_REGEX.test(normalizedEmail)) {
+    throw new AppError('customerEmail debe tener un formato válido', 400);
+  }
+
+  return normalizedEmail;
+}
+
+function normalizeReferencePointDescription(description) {
+  if (typeof description !== 'string') return null;
+  const normalized = description.trim();
+  return normalized || null;
+}
+
 /**
  * Obtiene las fechas disponibles (planeaciones) para una actividad específica
  */
@@ -32,15 +53,16 @@ async function createBooking(payload) {
     activityScheduleId,
     companyId = null,
     referencePointId = null,
+    referencePointDescription = null,
     transport = false,
     numberOfPeople,
     adultCount = 0,
     childCount = 0,
     seniorCount = 0,
+    infantCount = 0,
     passengerCount = null,
     comment = null,
     paymentTypeId,
-    cardTypeId = null,
     commissionPercentage = null, // Si es null, se usa el de la compañía
     subtotal = null,
     vatAmount = null,
@@ -48,7 +70,7 @@ async function createBooking(payload) {
     exempt = false,
     commissionAmount = null,
     customerName,
-    customerEmail = null,
+    customerEmail,
     customerPhone = null,
     status = 'pending',
     createdBy = null
@@ -60,15 +82,15 @@ async function createBooking(payload) {
   }
 
   // Validar que los conteos no sean negativos
-  if (adultCount < 0 || childCount < 0 || seniorCount < 0) {
-    throw new AppError('adultCount, childCount y seniorCount no pueden ser negativos', 400);
+  if (adultCount < 0 || childCount < 0 || seniorCount < 0 || infantCount < 0) {
+    throw new AppError('adultCount, childCount, seniorCount e infantCount no pueden ser negativos', 400);
   }
 
-  // Validar que la suma de adultCount + childCount + seniorCount sea igual a numberOfPeople
-  const totalCount = adultCount + childCount + seniorCount;
+  // Validar que la suma por categoria sea igual a numberOfPeople
+  const totalCount = adultCount + childCount + seniorCount + infantCount;
   if (totalCount !== numberOfPeople) {
     throw new AppError(
-      `La suma de adultCount (${adultCount}) + childCount (${childCount}) + seniorCount (${seniorCount}) debe ser igual a numberOfPeople (${numberOfPeople})`,
+      `La suma de adultCount (${adultCount}) + childCount (${childCount}) + seniorCount (${seniorCount}) + infantCount (${infantCount}) debe ser igual a numberOfPeople (${numberOfPeople})`,
       400
     );
   }
@@ -114,17 +136,25 @@ async function createBooking(payload) {
     throw new AppError('El porcentaje de comisión debe estar entre 0 y 100', 400);
   }
 
-  if (transport) {
-    if (!referencePointId) {
-      throw new AppError('referencePointId es requerido cuando la reserva requiere transporte', 400);
-    }
+  let finalReferencePointId = null;
+  let finalReferencePointDescription = null;
 
-    const referencePoint = await referencePointsRepo.getReferencePointById(referencePointId);
-    if (!referencePoint) {
-      throw new AppError('El punto de referencia especificado no existe', 404);
-    }
-    if (!referencePoint.status) {
-      throw new AppError('El punto de referencia especificado no está activo', 400);
+  if (transport) {
+    if (referencePointId) {
+      const referencePoint = await referencePointsRepo.getReferencePointById(referencePointId);
+      if (!referencePoint) {
+        throw new AppError('El punto de referencia especificado no existe', 404);
+      }
+      if (!referencePoint.status) {
+        throw new AppError('El punto de referencia especificado no está activo', 400);
+      }
+      finalReferencePointId = referencePointId;
+      finalReferencePointDescription = referencePoint.description;
+    } else {
+      finalReferencePointDescription = normalizeReferencePointDescription(referencePointDescription);
+      if (!finalReferencePointDescription) {
+        throw new AppError('referencePointDescription es requerido cuando la reserva requiere transporte sin punto de referencia de catálogo', 400);
+      }
     }
   }
 
@@ -139,6 +169,8 @@ async function createBooking(payload) {
   if (!paymentTypeId) {
     throw new AppError('paymentTypeId es requerido', 400);
   }
+
+  const normalizedCustomerEmail = normalizeRequiredEmail(customerEmail);
 
   const nonNegativeMoney = (label, value) => {
     if (value === null || value === undefined) return;
@@ -156,16 +188,18 @@ async function createBooking(payload) {
   const booking = await bookingsRepo.createBooking({
     activityScheduleId,
     companyId,
-    referencePointId: transport ? referencePointId : null,
+    referencePointId: finalReferencePointId,
+    referencePointDescription: finalReferencePointDescription,
     transport,
     numberOfPeople,
     adultCount,
     childCount,
     seniorCount,
+    infantCount,
     passengerCount,
     comment,
     paymentTypeId,
-    cardTypeId,
+    cardTypeId: null,
     commissionPercentage: finalCommissionPercentage,
     subtotal,
     vatAmount,
@@ -173,7 +207,7 @@ async function createBooking(payload) {
     exempt: Boolean(exempt),
     commissionAmount,
     customerName,
-    customerEmail,
+    customerEmail: normalizedCustomerEmail,
     customerPhone,
     status,
     createdBy
@@ -204,11 +238,13 @@ async function updateBooking(bookingId, payload) {
     activityScheduleId,
     companyId,
     referencePointId,
+    referencePointDescription,
     transport,
     numberOfPeople,
     adultCount,
     childCount,
     seniorCount,
+    infantCount,
     passengerCount,
     commissionPercentage,
     subtotal,
@@ -222,7 +258,10 @@ async function updateBooking(bookingId, payload) {
     status
   } = payload;
 
-  if (transport !== undefined || referencePointId !== undefined) {
+  const updatePayload = { ...payload };
+  delete updatePayload.cardTypeId;
+
+  if (transport !== undefined || referencePointId !== undefined || referencePointDescription !== undefined) {
     const booking = await bookingsRepo.getBookingById(bookingId);
     if (!booking) {
       throw new AppError('Reserva no encontrada', 404);
@@ -230,19 +269,31 @@ async function updateBooking(bookingId, payload) {
 
     const finalTransport = transport !== undefined ? transport : booking.transport;
     const finalReferencePointId = referencePointId !== undefined ? referencePointId : booking.referencePointId;
+    const finalReferencePointDescription = referencePointDescription !== undefined
+      ? normalizeReferencePointDescription(referencePointDescription)
+      : normalizeReferencePointDescription(booking.referencePointDescription);
 
     if (finalTransport) {
-      if (!finalReferencePointId) {
-        throw new AppError('referencePointId es requerido cuando la reserva requiere transporte', 400);
+      if (finalReferencePointId) {
+        const referencePoint = await referencePointsRepo.getReferencePointById(finalReferencePointId);
+        if (!referencePoint) {
+          throw new AppError('El punto de referencia especificado no existe', 404);
+        }
+        if (!referencePoint.status) {
+          throw new AppError('El punto de referencia especificado no está activo', 400);
+        }
+        updatePayload.referencePointId = finalReferencePointId;
+        updatePayload.referencePointDescription = referencePoint.description;
+      } else {
+        if (!finalReferencePointDescription) {
+          throw new AppError('referencePointDescription es requerido cuando la reserva requiere transporte sin punto de referencia de catálogo', 400);
+        }
+        updatePayload.referencePointId = null;
+        updatePayload.referencePointDescription = finalReferencePointDescription;
       }
-
-      const referencePoint = await referencePointsRepo.getReferencePointById(finalReferencePointId);
-      if (!referencePoint) {
-        throw new AppError('El punto de referencia especificado no existe', 404);
-      }
-      if (!referencePoint.status) {
-        throw new AppError('El punto de referencia especificado no está activo', 400);
-      }
+    } else {
+      updatePayload.referencePointId = null;
+      updatePayload.referencePointDescription = null;
     }
   }
 
@@ -256,9 +307,12 @@ async function updateBooking(bookingId, payload) {
   if (seniorCount !== undefined && seniorCount < 0) {
     throw new AppError('seniorCount no puede ser negativo', 400);
   }
+  if (infantCount !== undefined && infantCount < 0) {
+    throw new AppError('infantCount no puede ser negativo', 400);
+  }
 
   // Si se actualizan los conteos o numberOfPeople, validar que coincidan
-  if (adultCount !== undefined || childCount !== undefined || seniorCount !== undefined || numberOfPeople !== undefined) {
+  if (adultCount !== undefined || childCount !== undefined || seniorCount !== undefined || infantCount !== undefined || numberOfPeople !== undefined) {
     const booking = await bookingsRepo.getBookingById(bookingId);
     if (!booking) {
       throw new AppError('Reserva no encontrada', 404);
@@ -267,12 +321,13 @@ async function updateBooking(bookingId, payload) {
     const finalAdultCount = adultCount !== undefined ? adultCount : booking.adultCount;
     const finalChildCount = childCount !== undefined ? childCount : booking.childCount;
     const finalSeniorCount = seniorCount !== undefined ? seniorCount : booking.seniorCount;
+    const finalInfantCount = infantCount !== undefined ? infantCount : booking.infantCount;
     const finalNumberOfPeople = numberOfPeople !== undefined ? numberOfPeople : booking.numberOfPeople;
 
-    const totalCount = finalAdultCount + finalChildCount + finalSeniorCount;
+    const totalCount = finalAdultCount + finalChildCount + finalSeniorCount + finalInfantCount;
     if (totalCount !== finalNumberOfPeople) {
       throw new AppError(
-        `La suma de adultCount (${finalAdultCount}) + childCount (${finalChildCount}) + seniorCount (${finalSeniorCount}) debe ser igual a numberOfPeople (${finalNumberOfPeople})`,
+        `La suma de adultCount (${finalAdultCount}) + childCount (${finalChildCount}) + seniorCount (${finalSeniorCount}) + infantCount (${finalInfantCount}) debe ser igual a numberOfPeople (${finalNumberOfPeople})`,
         400
       );
     }
@@ -328,6 +383,10 @@ async function updateBooking(bookingId, payload) {
   nonNegativeMoney('total', total);
   nonNegativeMoney('commissionAmount', commissionAmount);
 
+  if (customerEmail !== undefined) {
+    updatePayload.customerEmail = normalizeRequiredEmail(customerEmail);
+  }
+
   // Validar passenger_count si transport es true
   if (transport !== undefined && transport && passengerCount !== null && passengerCount !== undefined) {
     if (passengerCount < 0) {
@@ -335,7 +394,7 @@ async function updateBooking(bookingId, payload) {
     }
   }
 
-  return bookingsRepo.updateBooking(bookingId, payload);
+  return bookingsRepo.updateBooking(bookingId, updatePayload);
 }
 
 /**

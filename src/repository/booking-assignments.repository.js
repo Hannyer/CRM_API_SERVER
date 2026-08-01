@@ -40,13 +40,14 @@ async function getAssignmentsByBookingId(bookingId) {
       t.operational_status as "operationalStatus",
       bt.created_at as "assignedAt",
       bt.reference_point_id as "referencePointId",
-      rp.description as "referencePointDescription",
+      COALESCE(rp.description, b.reference_point_description) as "referencePointDescription",
       bt.pickup_at as "pickupAt",
       d.id as "driverId",
       d.full_name as "driverName",
       d.email as "driverEmail",
       d.phone as "driverPhone"
     FROM ops.booking_transport bt
+    JOIN ops.booking b ON b.id = bt.booking_id
     JOIN ops.transport t ON t.id = bt.transport_id
     LEFT JOIN ops.app_user d ON d.id = bt.driver_id
     LEFT JOIN ops.reference_point rp ON rp.id = bt.reference_point_id
@@ -309,7 +310,7 @@ async function listBookingTransportAssignments() {
       t.operational_status as "operationalStatus",
       bt.created_at as "assignedAt",
       bt.reference_point_id as "referencePointId",
-      rp.description as "referencePointDescription",
+      COALESCE(rp.description, b.reference_point_description) as "referencePointDescription",
       bt.pickup_at as "pickupAt",
       d.id as "driverId",
       d.full_name as "driverName",
@@ -460,7 +461,7 @@ async function listDriverAssignmentsByUser(userId, { startDateTime = null, endDa
       t.capacity,
       t.license_plate as "licensePlate",
       bt.reference_point_id as "referencePointId",
-      rp.description as "referencePointDescription",
+      COALESCE(rp.description, b.reference_point_description) as "referencePointDescription",
       bt.pickup_at as "pickupAt"
     FROM ops.booking_transport bt
     JOIN ops.booking b ON b.id = bt.booking_id

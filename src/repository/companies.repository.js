@@ -5,13 +5,13 @@ const { pool } = require('../config/db.pg');
  * Crea una nueva compañía
  * Retorna el registro creado.
  */
-async function createCompany({ name, commissionPercentage, status = true }) {
+async function createCompany({ name, email, phone, commissionPercentage, status = true }) {
   const sql = `
-    INSERT INTO ops.company (name, commission_percentage, status)
-    VALUES ($1, $2::numeric, $3::bool)
-    RETURNING id, name, commission_percentage as "commissionPercentage", status, created_at as "createdAt", updated_at as "updatedAt";
+    INSERT INTO ops.company (name, email, phone, commission_percentage, status)
+    VALUES ($1, $2, $3, $4::numeric, $5::bool)
+    RETURNING id, name, email, phone, commission_percentage as "commissionPercentage", status, created_at as "createdAt", updated_at as "updatedAt";
   `;
-  const params = [name, commissionPercentage, status];
+  const params = [name, email, phone, commissionPercentage, status];
   const { rows } = await pool.query(sql, params);
   return rows[0];
 }
@@ -44,6 +44,8 @@ async function listCompanies({ page = 1, limit = 10, status = null } = {}) {
     SELECT 
       id,
       name,
+      email,
+      phone,
       commission_percentage as "commissionPercentage",
       status,
       created_at as "createdAt",
@@ -74,6 +76,8 @@ async function getCompanyById(companyId) {
     SELECT 
       id,
       name,
+      email,
+      phone,
       commission_percentage as "commissionPercentage",
       status,
       created_at as "createdAt",
@@ -90,7 +94,7 @@ async function getCompanyById(companyId) {
 /**
  * Actualiza una compañía existente
  */
-async function updateCompany(companyId, { name, commissionPercentage, status }) {
+async function updateCompany(companyId, { name, email, phone, commissionPercentage, status }) {
   const updates = [];
   const params = [];
   let paramIndex = 1;
@@ -98,6 +102,14 @@ async function updateCompany(companyId, { name, commissionPercentage, status }) 
   if (name !== undefined) {
     updates.push(`name = $${paramIndex++}`);
     params.push(name);
+  }
+  if (email !== undefined) {
+    updates.push(`email = $${paramIndex++}`);
+    params.push(email);
+  }
+  if (phone !== undefined) {
+    updates.push(`phone = $${paramIndex++}`);
+    params.push(phone);
   }
   if (commissionPercentage !== undefined) {
     updates.push(`commission_percentage = $${paramIndex++}::numeric`);
@@ -120,7 +132,7 @@ async function updateCompany(companyId, { name, commissionPercentage, status }) 
     UPDATE ops.company
     SET ${updates.join(', ')}
     WHERE id = $${paramIndex}::uuid
-    RETURNING id, name, commission_percentage as "commissionPercentage", status, created_at as "createdAt", updated_at as "updatedAt";
+    RETURNING id, name, email, phone, commission_percentage as "commissionPercentage", status, created_at as "createdAt", updated_at as "updatedAt";
   `;
 
   const { rows } = await pool.query(sql, params);
@@ -140,7 +152,7 @@ async function toggleCompanyStatus(companyId, status) {
     UPDATE ops.company
     SET status = $1::bool, updated_at = CURRENT_TIMESTAMP
     WHERE id = $2::uuid
-    RETURNING id, name, commission_percentage as "commissionPercentage", status, created_at as "createdAt", updated_at as "updatedAt";
+    RETURNING id, name, email, phone, commission_percentage as "commissionPercentage", status, created_at as "createdAt", updated_at as "updatedAt";
     `,
     [status, companyId]
   );
@@ -162,7 +174,7 @@ async function deleteCompany(companyId) {
     UPDATE ops.company
     SET status = false, updated_at = CURRENT_TIMESTAMP
     WHERE id = $1::uuid
-    RETURNING id, name, status;
+    RETURNING id, name, email, phone, status;
     `,
     [companyId]
   );

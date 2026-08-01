@@ -60,6 +60,8 @@ CREATE INDEX IF NOT EXISTS idx_guide_is_leader ON ops.guide(is_leader);
 CREATE TABLE IF NOT EXISTS ops.company (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    phone VARCHAR(30) NOT NULL,
     commission_percentage NUMERIC(5, 2) NOT NULL CHECK (commission_percentage >= 0 AND commission_percentage <= 100),
     status BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
@@ -67,6 +69,7 @@ CREATE TABLE IF NOT EXISTS ops.company (
 );
 CREATE INDEX IF NOT EXISTS idx_company_status ON ops.company(status);
 CREATE INDEX IF NOT EXISTS idx_company_name ON ops.company(name);
+CREATE INDEX IF NOT EXISTS idx_company_email ON ops.company(email);
 CREATE INDEX IF NOT EXISTS idx_company_created_at ON ops.company(created_at);
 
 -- 2.5 Transporte
@@ -228,8 +231,13 @@ CREATE TABLE IF NOT EXISTS ops.booking (
     company_id UUID REFERENCES ops.company(id) ON DELETE SET NULL,
     transport_id UUID REFERENCES ops.transport(id) ON DELETE SET NULL,
     reference_point_id UUID REFERENCES ops.reference_point(id) ON DELETE SET NULL,
+    reference_point_description TEXT,
     transport BOOLEAN NOT NULL DEFAULT false, -- coincide con repositorio (campo booleano)
     number_of_people INTEGER NOT NULL CHECK (number_of_people > 0),
+    adult_count INTEGER NOT NULL DEFAULT 0 CHECK (adult_count >= 0),
+    child_count INTEGER NOT NULL DEFAULT 0 CHECK (child_count >= 0),
+    senior_count INTEGER NOT NULL DEFAULT 0 CHECK (senior_count >= 0),
+    infant_count INTEGER NOT NULL DEFAULT 0 CHECK (infant_count >= 0),
     passenger_count INTEGER, -- opcional, para diferenciar adultos/niños si se requiere
     commission_percentage NUMERIC(5, 2) NOT NULL CHECK (commission_percentage >= 0 AND commission_percentage <= 100),
     commission_amount NUMERIC(14, 2),
@@ -257,11 +265,11 @@ CREATE INDEX IF NOT EXISTS idx_booking_schedule_status
 DO $$
 BEGIN
     IF NOT EXISTS (
-        SELECT 1 FROM pg_constraint WHERE conname = 'booking_transport_requires_reference_point'
+        SELECT 1 FROM pg_constraint WHERE conname = 'booking_transport_requires_reference_description'
     ) THEN
         ALTER TABLE ops.booking
-            ADD CONSTRAINT booking_transport_requires_reference_point
-            CHECK (transport = false OR reference_point_id IS NOT NULL);
+            ADD CONSTRAINT booking_transport_requires_reference_description
+            CHECK (transport = false OR length(trim(COALESCE(reference_point_description, ''))) > 0);
     END IF;
 END $$;
 

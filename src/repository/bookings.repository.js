@@ -119,11 +119,13 @@ async function createBooking({
   activityScheduleId,
   companyId = null,
   referencePointId = null,
+  referencePointDescription = null,
   transport = false,
   numberOfPeople,
   adultCount = 0,
   childCount = 0,
   seniorCount = 0,
+  infantCount = 0,
   passengerCount = null,
   comment = null,
   paymentTypeId,
@@ -145,11 +147,13 @@ async function createBooking({
       activity_schedule_id, 
       company_id, 
       reference_point_id,
+      reference_point_description,
       transport, 
       number_of_people,
       adult_count,
       child_count,
       senior_count,
+      infant_count,
       passenger_count,
       comment,
       payment_type_id,
@@ -166,17 +170,19 @@ async function createBooking({
       status,
       created_by
     )
-    VALUES ($1::uuid, $2::uuid, $3::uuid, $4::bool, $5::int, $6::int, $7::int, $8::int, $9::int, $10::text, $11::uuid, $12::uuid, $13::numeric, $14::numeric, $15::numeric, $16::numeric, $17::bool, $18::numeric, $19, $20, $21, $22, $23::uuid)
+    VALUES ($1::uuid, $2::uuid, $3::uuid, $4::text, $5::bool, $6::int, $7::int, $8::int, $9::int, $10::int, $11::int, $12::text, $13::uuid, $14::uuid, $15::numeric, $16::numeric, $17::numeric, $18::numeric, $19::bool, $20::numeric, $21, $22, $23, $24, $25::uuid)
     RETURNING 
       id,
       activity_schedule_id as "activityScheduleId",
       company_id as "companyId",
       reference_point_id as "referencePointId",
+      reference_point_description as "referencePointDescription",
       transport,
       number_of_people as "numberOfPeople",
       adult_count as "adultCount",
       child_count as "childCount",
       senior_count as "seniorCount",
+      infant_count as "infantCount",
       passenger_count as "passengerCount",
       comment,
       payment_type_id as "paymentTypeId",
@@ -199,11 +205,13 @@ async function createBooking({
     activityScheduleId,
     companyId,
     referencePointId,
+    referencePointDescription,
     transport,
     numberOfPeople,
     adultCount,
     childCount,
     seniorCount,
+    infantCount,
     passengerCount,
     comment,
     paymentTypeId,
@@ -260,12 +268,13 @@ async function listBookings({ page = 1, limit = 10, status = null, activitySched
       b.activity_schedule_id as "activityScheduleId",
       b.company_id as "companyId",
       b.reference_point_id as "referencePointId",
-      rp.description as "referencePointDescription",
+      COALESCE(b.reference_point_description, rp.description) as "referencePointDescription",
       b.transport,
       b.number_of_people as "numberOfPeople",
       b.adult_count as "adultCount",
       b.child_count as "childCount",
       b.senior_count as "seniorCount",
+      b.infant_count as "infantCount",
       b.passenger_count as "passengerCount",
       b.comment,
       b.payment_type_id as "paymentTypeId",
@@ -323,12 +332,13 @@ async function getBookingById(bookingId) {
       b.activity_schedule_id as "activityScheduleId",
       b.company_id as "companyId",
       b.reference_point_id as "referencePointId",
-      rp.description as "referencePointDescription",
+      COALESCE(b.reference_point_description, rp.description) as "referencePointDescription",
       b.transport,
       b.number_of_people as "numberOfPeople",
       b.adult_count as "adultCount",
       b.child_count as "childCount",
       b.senior_count as "seniorCount",
+      b.infant_count as "infantCount",
       b.passenger_count as "passengerCount",
       b.comment,
       b.payment_type_id as "paymentTypeId",
@@ -377,11 +387,13 @@ async function updateBooking(bookingId, {
   activityScheduleId,
   companyId,
   referencePointId,
+  referencePointDescription,
   transport,
   numberOfPeople,
   adultCount,
   childCount,
   seniorCount,
+  infantCount,
   passengerCount,
   comment,
   paymentTypeId,
@@ -413,6 +425,10 @@ async function updateBooking(bookingId, {
     updates.push(`reference_point_id = $${paramIndex++}::uuid`);
     params.push(referencePointId);
   }
+  if (referencePointDescription !== undefined) {
+    updates.push(`reference_point_description = $${paramIndex++}::text`);
+    params.push(referencePointDescription);
+  }
   if (transport !== undefined) {
     updates.push(`transport = $${paramIndex++}::bool`);
     params.push(transport);
@@ -432,6 +448,10 @@ async function updateBooking(bookingId, {
   if (seniorCount !== undefined) {
     updates.push(`senior_count = $${paramIndex++}::int`);
     params.push(seniorCount);
+  }
+  if (infantCount !== undefined) {
+    updates.push(`infant_count = $${paramIndex++}::int`);
+    params.push(infantCount);
   }
   if (passengerCount !== undefined) {
     updates.push(`passenger_count = $${paramIndex++}::int`);
@@ -507,11 +527,13 @@ async function updateBooking(bookingId, {
       activity_schedule_id as "activityScheduleId",
       company_id as "companyId",
       reference_point_id as "referencePointId",
+      reference_point_description as "referencePointDescription",
       transport,
       number_of_people as "numberOfPeople",
       adult_count as "adultCount",
       child_count as "childCount",
       senior_count as "seniorCount",
+      infant_count as "infantCount",
       passenger_count as "passengerCount",
       comment,
       payment_type_id as "paymentTypeId",

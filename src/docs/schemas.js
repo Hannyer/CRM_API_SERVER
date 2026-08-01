@@ -209,11 +209,10 @@ module.exports = {
               },
             },
           },
-          speaksEnglish: { type: 'boolean', example: false },
           status: { type: 'boolean', example: true },
           languages: {
             type: 'array',
-            description: 'Idiomas del guía (ops.guide_language + ops.language). Vacío si no es Guía',
+            description: 'Idiomas del usuario (ops.guide_language + ops.language). Obligatorio para todos los usuarios',
             items: {
               type: 'object',
               properties: {
@@ -230,7 +229,7 @@ module.exports = {
 
       UserCreateRequest: {
         type: 'object',
-        required: ['cedula', 'email', 'fullName', 'phone', 'password', 'roleId'],
+        required: ['cedula', 'email', 'fullName', 'phone', 'password', 'roleId', 'languageIds'],
         properties: {
           cedula: { type: 'string', example: '1-2345-6789' },
           email: { type: 'string', format: 'email', example: 'usuario@correo.com' },
@@ -250,12 +249,12 @@ module.exports = {
               },
             },
           },
-          speaksEnglish: { type: 'boolean', example: false },
           status: { type: 'boolean', example: true },
           languageIds: {
             type: 'array',
             items: { type: 'string', format: 'uuid' },
-            description: 'Obligatorio si roleId es rol Guía (requiresLanguages). IDs de ops.language',
+            minItems: 1,
+            description: 'Obligatorio para todos los usuarios. IDs de ops.language',
             example: ['123e4567-e89b-12d3-a456-426614174000'],
           },
         },
@@ -281,12 +280,12 @@ module.exports = {
               },
             },
           },
-          speaksEnglish: { type: 'boolean' },
           status: { type: 'boolean' },
           languageIds: {
             type: 'array',
             items: { type: 'string', format: 'uuid' },
-            description: 'Actualiza idiomas en ops.guide_language. Obligatorio al cambiar a rol Guía',
+            minItems: 1,
+            description: 'Actualiza idiomas en ops.guide_language. Obligatorio para todos los usuarios',
           },
         },
       },

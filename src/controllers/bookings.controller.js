@@ -229,7 +229,7 @@ async function GetConfigurationsBookings(req, res) {
  *   post:
  *     tags: [Bookings]
  *     summary: Crear una nueva reserva
- *     description: Crea una nueva reserva de actividad. Valida disponibilidad de espacios, puede asociar una compañía (socio) con comisión parametrizada o manual, y opcionalmente indicar si se requiere transporte con cantidad de pasajeros y punto de referencia.
+ *     description: Crea una nueva reserva de actividad. Valida disponibilidad de espacios, puede asociar una compañía (socio) con comisión parametrizada o manual, y opcionalmente indicar si se requiere transporte con cantidad de pasajeros y punto de referencia de catálogo o referencia manual.
  *     requestBody:
  *       required: true
  *       content:
@@ -240,6 +240,7 @@ async function GetConfigurationsBookings(req, res) {
  *               - activityScheduleId
  *               - numberOfPeople
  *               - customerName
+ *               - customerEmail
  *             properties:
  *               activityScheduleId:
  *                 type: string
@@ -252,12 +253,16 @@ async function GetConfigurationsBookings(req, res) {
  *               transport:
  *                 type: boolean
  *                 default: false
- *                 description: Indica si se requiere transporte para la reserva. Si es true, referencePointId es requerido
+ *                 description: Indica si se requiere transporte para la reserva. Si es true, se requiere referencePointId o referencePointDescription
  *               referencePointId:
  *                 type: string
  *                 format: uuid
  *                 nullable: true
- *                 description: ID del punto de referencia. Requerido cuando transport es true
+ *                 description: ID del punto de referencia de catálogo. Si se envía, el API guarda también su descripción en la reserva
+ *               referencePointDescription:
+ *                 type: string
+ *                 nullable: true
+ *                 description: Referencia manual cuando no existe punto en catálogo; requerida si transport es true y referencePointId es null
  *               numberOfPeople:
  *                 type: integer
  *                 minimum: 1
@@ -277,6 +282,11 @@ async function GetConfigurationsBookings(req, res) {
  *                 minimum: 0
  *                 default: 0
  *                 description: Cantidad de adultos mayores en la reserva
+ *               infantCount:
+ *                 type: integer
+ *                 minimum: 0
+ *                 default: 0
+ *                 description: Cantidad de infantes menores a 6 años (precio 0)
  *               passengerCount:
  *                 type: integer
  *                 minimum: 0
@@ -289,11 +299,6 @@ async function GetConfigurationsBookings(req, res) {
  *                 type: string
  *                 format: uuid
  *                 description: ID del tipo de pago (Efectivo, Tarjeta)
- *               cardTypeId:
- *                 type: string
- *                 format: uuid
- *                 nullable: true
- *                 description: ID del tipo de tarjeta (requerido si el tipo de pago es Tarjeta)
  *               commissionPercentage:
  *                 type: number
  *                 format: float
@@ -334,7 +339,7 @@ async function GetConfigurationsBookings(req, res) {
  *               customerEmail:
  *                 type: string
  *                 format: email
- *                 description: Email del cliente (opcional)
+ *                 description: Email del cliente
  *               customerPhone:
  *                 type: string
  *                 description: Teléfono del cliente (opcional)
@@ -385,10 +390,6 @@ async function GetConfigurationsBookings(req, res) {
  *                 paymentTypeId:
  *                   type: string
  *                   format: uuid
- *                 cardTypeId:
- *                   type: string
- *                   format: uuid
- *                   nullable: true
  *                 commissionPercentage:
  *                   type: number
  *                   format: float
@@ -437,9 +438,9 @@ async function create(req, res) {
   try {
     const payload = req.body || {};
     
-    if (!payload.activityScheduleId || !payload.numberOfPeople || !payload.customerName) {
+    if (!payload.activityScheduleId || !payload.numberOfPeople || !payload.customerName || !payload.customerEmail) {
       return res.status(400).json({ 
-        message: 'activityScheduleId, numberOfPeople y customerName son requeridos' 
+        message: 'activityScheduleId, numberOfPeople, customerName y customerEmail son requeridos'
       });
     }
 
@@ -538,6 +539,8 @@ async function create(req, res) {
  *                       childCount:
  *                         type: integer
  *                       seniorCount:
+ *                         type: integer
+ *                       infantCount:
  *                         type: integer
  *                       passengerCount:
  *                         type: integer
@@ -704,6 +707,8 @@ async function list(req, res) {
  *                   type: integer
  *                 seniorCount:
  *                   type: integer
+ *                 infantCount:
+ *                   type: integer
  *                 passengerCount:
  *                   type: integer
  *                   nullable: true
@@ -771,7 +776,7 @@ async function getById(req, res) {
  *   put:
  *     tags: [Bookings]
  *     summary: Actualizar una reserva
- *     description: Actualiza la información de una reserva existente. Solo se actualizan los campos proporcionados. Valida disponibilidad si se cambia la planeación o el número de personas. Si transport es true, la reserva debe tener referencePointId.
+ *     description: Actualiza la información de una reserva existente. Solo se actualizan los campos proporcionados. Valida disponibilidad si se cambia la planeación o el número de personas. Si transport es true, la reserva debe tener punto de referencia de catálogo o referencia manual.
  *     parameters:
  *       - in: path
  *         name: id
@@ -797,12 +802,16 @@ async function getById(req, res) {
  *                 description: Nueva compañía asociada (puede ser null para eliminar)
  *               transport:
  *                 type: boolean
- *                 description: Indica si se requiere transporte para la reserva. Si es true, referencePointId es requerido
+ *                 description: Indica si se requiere transporte para la reserva. Si es true, se requiere referencePointId o referencePointDescription
  *               referencePointId:
  *                 type: string
  *                 format: uuid
  *                 nullable: true
- *                 description: ID del punto de referencia. Requerido cuando transport es true; enviar null al desactivar transporte
+ *                 description: ID del punto de referencia de catálogo; enviar null para usar referencia manual o al desactivar transporte
+ *               referencePointDescription:
+ *                 type: string
+ *                 nullable: true
+ *                 description: Referencia manual cuando no existe punto en catálogo; requerida si transport es true y referencePointId es null
  *               numberOfPeople:
  *                 type: integer
  *                 minimum: 1
@@ -819,6 +828,10 @@ async function getById(req, res) {
  *                 type: integer
  *                 minimum: 0
  *                 description: Nueva cantidad de adultos mayores
+ *               infantCount:
+ *                 type: integer
+ *                 minimum: 0
+ *                 description: Nueva cantidad de infantes menores a 6 años (precio 0)
  *               passengerCount:
  *                 type: integer
  *                 minimum: 0

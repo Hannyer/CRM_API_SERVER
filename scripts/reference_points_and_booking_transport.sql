@@ -99,7 +99,8 @@ ON CONFLICT (role_id, menu_id) DO UPDATE SET
 -- ============================================================
 
 ALTER TABLE ops.booking
-  ADD COLUMN IF NOT EXISTS reference_point_id uuid NULL;
+  ADD COLUMN IF NOT EXISTS reference_point_id uuid NULL,
+  ADD COLUMN IF NOT EXISTS reference_point_description text NULL;
 
 CREATE INDEX IF NOT EXISTS idx_booking_reference_point_id
   ON ops.booking(reference_point_id);
@@ -121,37 +122,32 @@ BEGIN
   END IF;
 END $$;
 
--- IMPORTANTE:
--- Si ya existen reservas con transport = true y reference_point_id NULL,
--- actualizalas antes de activar el constraint obligatorio.
--- Ejemplo:
--- UPDATE ops.booking
--- SET reference_point_id = '<UUID_DE_PUNTO_DE_REFERENCIA>'::uuid
--- WHERE transport = true AND reference_point_id IS NULL;
+UPDATE ops.booking b
+SET reference_point_description = rp.description
+FROM ops.reference_point rp
+WHERE b.reference_point_id = rp.id
+  AND (b.reference_point_description IS NULL OR length(trim(b.reference_point_description)) = 0);
 
 DO $$
 BEGIN
-  IF EXISTS (
-    SELECT 1 FROM ops.booking WHERE transport = true AND reference_point_id IS NULL
-  ) THEN
-    RAISE EXCEPTION 'Existen reservas con transport = true sin reference_point_id. Actualiza esos datos antes de crear el constraint.';
-  END IF;
+  ALTER TABLE ops.booking DROP CONSTRAINT IF EXISTS booking_transport_requires_reference_point;
 
   IF NOT EXISTS (
     SELECT 1
     FROM pg_constraint c
     JOIN pg_class t ON t.oid = c.conrelid
     JOIN pg_namespace n ON n.oid = t.relnamespace
-    WHERE c.conname = 'booking_transport_requires_reference_point'
+    WHERE c.conname = 'booking_transport_requires_reference_description'
       AND n.nspname = 'ops'
       AND t.relname = 'booking'
   ) THEN
     ALTER TABLE ops.booking
-      ADD CONSTRAINT booking_transport_requires_reference_point
-      CHECK (transport = false OR reference_point_id IS NOT NULL);
+      ADD CONSTRAINT booking_transport_requires_reference_description
+      CHECK (transport = false OR length(trim(COALESCE(reference_point_description, ''))) > 0);
   END IF;
 END $$;
 
-COMMENT ON COLUMN ops.booking.reference_point_id IS 'Punto de referencia requerido cuando la reserva requiere transporte';
+COMMENT ON COLUMN ops.booking.reference_point_id IS 'Punto de referencia de catalogo usado para transporte; puede ser null si se digita referencia manual';
+COMMENT ON COLUMN ops.booking.reference_point_description IS 'Descripcion del punto de referencia seleccionado o referencia manual para transporte';
 
 COMMIT;

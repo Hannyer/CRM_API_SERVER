@@ -166,7 +166,7 @@ async function listLicenseTypes(_req, res) {
  *   post:
  *     tags: [Users]
  *     summary: Crear usuario
- *     description: Registra un nuevo usuario. Si roleId es Guía, languageIds (ops.language) es obligatorio y se guarda en ops.guide_language.
+ *     description: Registra un nuevo usuario. languageIds (ops.language) es obligatorio para todos los roles y se guarda en ops.guide_language.
  *     requestBody:
  *       required: true
  *       content:
@@ -221,7 +221,7 @@ async function create(req, res) {
  *   put:
  *     tags: [Users]
  *     summary: Actualizar usuario
- *     description: Actualiza un usuario. Rol Guía requiere languageIds al cambiar de rol o si no tiene idiomas asignados.
+ *     description: Actualiza un usuario. Todos los roles requieren al menos un idioma asignado.
  *     parameters:
  *       - in: path
  *         name: id

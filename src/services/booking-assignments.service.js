@@ -172,16 +172,16 @@ async function assignTransport(bookingId, transportId, driverId = null, referenc
       throw new AppError('driverId es requerido cuando se asigna transporte', 400);
     }
 
-    if (!referencePointId) {
-      throw new AppError('referencePointId es requerido cuando se asigna transporte', 400);
-    }
-
-    const referencePoint = await referencePointsRepo.getReferencePointById(referencePointId);
-    if (!referencePoint) {
-      throw new AppError('El punto de referencia especificado no existe', 404);
-    }
-    if (!referencePoint.status) {
-      throw new AppError('El punto de referencia especificado no está activo', 400);
+    if (referencePointId) {
+      const referencePoint = await referencePointsRepo.getReferencePointById(referencePointId);
+      if (!referencePoint) {
+        throw new AppError('El punto de referencia especificado no existe', 404);
+      }
+      if (!referencePoint.status) {
+        throw new AppError('El punto de referencia especificado no está activo', 400);
+      }
+    } else if (!booking.referencePointDescription) {
+      throw new AppError('La reserva requiere punto de referencia o referencia manual para la recogida', 400);
     }
 
     if (!pickupAt || Number.isNaN(new Date(pickupAt).getTime())) {
@@ -261,7 +261,12 @@ async function confirmBooking(bookingId) {
       400
     );
   }
-  if (booking.transport && !assignments.transport.referencePointId) {
+  if (
+    booking.transport &&
+    !assignments.transport.referencePointId &&
+    !assignments.transport.referencePointDescription &&
+    !booking.referencePointDescription
+  ) {
     throw new AppError(
       'Esta reserva requiere punto de referencia para la recogida antes de confirmar',
       400

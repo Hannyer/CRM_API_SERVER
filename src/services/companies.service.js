@@ -1,4 +1,25 @@
 const companiesRepo = require('../repository/companies.repository');
+const { AppError } = require('../utils/AppError');
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function normalizeRequiredText(value, fieldName) {
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new AppError(`${fieldName} es requerido`, 400);
+  }
+
+  return value.trim();
+}
+
+function normalizeEmail(email) {
+  const normalizedEmail = normalizeRequiredText(email, 'email').toLowerCase();
+
+  if (!EMAIL_REGEX.test(normalizedEmail)) {
+    throw new AppError('email debe tener un formato válido', 400);
+  }
+
+  return normalizedEmail;
+}
 
 /**
  * Crea una nueva compañía
@@ -6,17 +27,25 @@ const companiesRepo = require('../repository/companies.repository');
 async function createCompany(payload) {
   const {
     name,
+    email,
+    phone,
     commissionPercentage,
     status = true,
   } = payload;
 
+  const normalizedName = normalizeRequiredText(name, 'name');
+  const normalizedEmail = normalizeEmail(email);
+  const normalizedPhone = normalizeRequiredText(phone, 'phone');
+
   // Validar que el porcentaje esté en el rango válido
   if (commissionPercentage < 0 || commissionPercentage > 100) {
-    throw new Error('El porcentaje de comisión debe estar entre 0 y 100');
+    throw new AppError('El porcentaje de comisión debe estar entre 0 y 100', 400);
   }
 
   return companiesRepo.createCompany({
-    name,
+    name: normalizedName,
+    email: normalizedEmail,
+    phone: normalizedPhone,
     commissionPercentage,
     status
   });
@@ -39,17 +68,22 @@ async function getCompanyById(companyId) {
 /**
  * Actualiza una compañía existente
  */
-async function updateCompany(companyId, { name, commissionPercentage, status }) {
+async function updateCompany(companyId, { name, email, phone, commissionPercentage, status }) {
+  const updateData = {};
+
+  if (name !== undefined) updateData.name = normalizeRequiredText(name, 'name');
+  if (email !== undefined) updateData.email = normalizeEmail(email);
+  if (phone !== undefined) updateData.phone = normalizeRequiredText(phone, 'phone');
+
   // Validar que el porcentaje esté en el rango válido si se proporciona
   if (commissionPercentage !== undefined && (commissionPercentage < 0 || commissionPercentage > 100)) {
-    throw new Error('El porcentaje de comisión debe estar entre 0 y 100');
+    throw new AppError('El porcentaje de comisión debe estar entre 0 y 100', 400);
   }
 
-  return companiesRepo.updateCompany(companyId, {
-    name,
-    commissionPercentage,
-    status
-  });
+  if (commissionPercentage !== undefined) updateData.commissionPercentage = commissionPercentage;
+  if (status !== undefined) updateData.status = status;
+
+  return companiesRepo.updateCompany(companyId, updateData);
 }
 
 /**

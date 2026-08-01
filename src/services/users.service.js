@@ -3,7 +3,6 @@ const userLanguagesRepo = require('../repository/user-languages.repository');
 const userLicensesRepo = require('../repository/user-licenses.repository');
 const rolesService = require('./roles.service');
 const { AppError } = require('../utils/AppError');
-const { isConductorRole, isGuiaRole } = require('../constants/roleIds');
 const { encrypt } = require('../utils/crypto-compat');
 
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -125,28 +124,14 @@ async function assertLanguagesExist(languageIds) {
   }
 }
 
-async function resolveLanguageIdsForRole(roleId, languageIds, { required = false } = {}) {
-  const requiresLanguages = await rolesService.roleRequiresLanguages(roleId);
+async function resolveRequiredLanguageIds(languageIds) {
   const normalized = normalizeLanguageIds(languageIds);
 
-  if (!requiresLanguages) {
-    if (normalized.length > 0) {
-      throw new AppError(
-        'languageIds solo aplica para usuarios con rol Guía',
-        400,
-        'GUIDE_LANGUAGES_NOT_ALLOWED'
-      );
-    }
-    return [];
-  }
-
-  if (required && normalized.length === 0) {
+  if (normalized.length === 0) {
     throw new AppError(
-      isGuiaRole(roleId)
-        ? 'languageIds es obligatorio para el rol Guía (al menos un idioma)'
-        : 'languageIds es obligatorio para el rol seleccionado (al menos un idioma)',
+      'languageIds es obligatorio para todos los usuarios (al menos un idioma)',
       400,
-      'GUIDE_LANGUAGES_REQUIRED'
+      'USER_LANGUAGES_REQUIRED'
     );
   }
 
@@ -252,9 +237,7 @@ async function createUser(payload) {
 
   await assertValidRoleId(roleId);
 
-  const resolvedLanguageIds = await resolveLanguageIdsForRole(roleId, languageIds, {
-    required: true,
-  });
+  const resolvedLanguageIds = await resolveRequiredLanguageIds(languageIds);
   const resolvedLicenses = await resolveLicensesForRole(roleId, licenses, {
     required: true,
   });
@@ -334,32 +317,17 @@ async function updateUser(userId, payload) {
   if (status !== undefined) updateData.status = !!status;
 
   const effectiveRoleId = updateData.roleId ?? current.roleId;
-
   const roleChanged = updateData.roleId !== undefined && updateData.roleId !== current.roleId;
-  const willRequireLanguages = await rolesService.roleRequiresLanguages(effectiveRoleId);
 
-  if (!willRequireLanguages) {
-    updateData.clearLanguages = true;
-  } else if (languageIds !== undefined) {
-    updateData.languageIds = await resolveLanguageIdsForRole(effectiveRoleId, languageIds, {
-      required: true,
-    });
-  } else if (roleChanged) {
-    const existingCount = Array.isArray(current.languages) ? current.languages.length : 0;
-    if (existingCount === 0) {
-      throw new AppError(
-        'languageIds es obligatorio al asignar el rol Guía',
-        400,
-        'GUIDE_LANGUAGES_REQUIRED'
-      );
-    }
+  if (languageIds !== undefined) {
+    updateData.languageIds = await resolveRequiredLanguageIds(languageIds);
   } else {
     const existingCount = Array.isArray(current.languages) ? current.languages.length : 0;
     if (existingCount === 0) {
       throw new AppError(
-        'El usuario Guía debe tener al menos un idioma (envíe languageIds)',
+        'El usuario debe tener al menos un idioma (envíe languageIds)',
         400,
-        'GUIDE_LANGUAGES_REQUIRED'
+        'USER_LANGUAGES_REQUIRED'
       );
     }
   }

@@ -48,6 +48,11 @@ const { sendErrorResponse } = require('../utils/errorHandler');
  *                         format: uuid
  *                       name:
  *                         type: string
+ *                       email:
+ *                         type: string
+ *                         format: email
+ *                       phone:
+ *                         type: string
  *                       commissionPercentage:
  *                         type: number
  *                         format: float
@@ -123,12 +128,23 @@ async function list(req, res) {
  *             type: object
  *             required:
  *               - name
+ *               - email
+ *               - phone
  *               - commissionPercentage
  *             properties:
  *               name:
  *                 type: string
  *                 description: Nombre de la compañía
  *                 example: "Tourismo ABC S.A."
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: Correo electrónico de contacto de la compañía
+ *                 example: "contacto@tourismoabc.com"
+ *               phone:
+ *                 type: string
+ *                 description: Número de teléfono de contacto de la compañía
+ *                 example: "+506 8888-8888"
  *               commissionPercentage:
  *                 type: number
  *                 format: float
@@ -153,6 +169,11 @@ async function list(req, res) {
  *                   format: uuid
  *                 name:
  *                   type: string
+ *                 email:
+ *                   type: string
+ *                   format: email
+ *                 phone:
+ *                   type: string
  *                 commissionPercentage:
  *                   type: number
  *                   format: float
@@ -172,8 +193,8 @@ async function list(req, res) {
 async function create(req, res) {
   try {
     const payload = req.body || {};
-    if (!payload.name || payload.commissionPercentage === undefined) {
-      return res.status(400).json({ message: 'name y commissionPercentage son requeridos' });
+    if (!payload.name || !payload.email || !payload.phone || payload.commissionPercentage === undefined) {
+      return res.status(400).json({ message: 'name, email, phone y commissionPercentage son requeridos' });
     }
 
     if (payload.commissionPercentage < 0 || payload.commissionPercentage > 100) {
@@ -222,6 +243,11 @@ async function create(req, res) {
  *                   type: string
  *                   format: uuid
  *                 name:
+ *                   type: string
+ *                 email:
+ *                   type: string
+ *                   format: email
+ *                 phone:
  *                   type: string
  *                 commissionPercentage:
  *                   type: number
@@ -280,6 +306,13 @@ async function getById(req, res) {
  *               name:
  *                 type: string
  *                 description: Nombre de la compañía
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: Correo electrónico de contacto de la compañía
+ *               phone:
+ *                 type: string
+ *                 description: Número de teléfono de contacto de la compañía
  *               commissionPercentage:
  *                 type: number
  *                 format: float
@@ -302,6 +335,11 @@ async function getById(req, res) {
  *                   format: uuid
  *                 name:
  *                   type: string
+ *                 email:
+ *                   type: string
+ *                   format: email
+ *                 phone:
+ *                   type: string
  *                 commissionPercentage:
  *                   type: number
  *                   format: float
@@ -323,7 +361,7 @@ async function getById(req, res) {
 async function update(req, res) {
   try {
     const { id } = req.params;
-    const { name, commissionPercentage, status } = req.body || {};
+    const { name, email, phone, commissionPercentage, status } = req.body || {};
     
     if (commissionPercentage !== undefined && (commissionPercentage < 0 || commissionPercentage > 100)) {
       return sendErrorResponse(res, { status: 400, message: 'commissionPercentage debe estar entre 0 y 100' });
@@ -331,6 +369,8 @@ async function update(req, res) {
     
     const company = await companiesService.updateCompany(id, {
       name,
+      email,
+      phone,
       commissionPercentage,
       status
     });
@@ -385,6 +425,11 @@ async function update(req, res) {
  *                   type: string
  *                   format: uuid
  *                 name:
+ *                   type: string
+ *                 email:
+ *                   type: string
+ *                   format: email
+ *                 phone:
  *                   type: string
  *                 commissionPercentage:
  *                   type: number
@@ -458,6 +503,11 @@ async function toggleStatus(req, res) {
  *                       type: string
  *                       format: uuid
  *                     name:
+ *                       type: string
+ *                     email:
+ *                       type: string
+ *                       format: email
+ *                     phone:
  *                       type: string
  *                     status:
  *                       type: boolean

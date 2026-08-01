@@ -12,6 +12,10 @@ CREATE TABLE IF NOT EXISTS ops.booking (
     company_id UUID REFERENCES ops.company(id) ON DELETE SET NULL,
     transport_id UUID REFERENCES ops.transport(id) ON DELETE SET NULL,
     number_of_people INTEGER NOT NULL CHECK (number_of_people > 0),
+    adult_count INTEGER NOT NULL DEFAULT 0 CHECK (adult_count >= 0),
+    child_count INTEGER NOT NULL DEFAULT 0 CHECK (child_count >= 0),
+    senior_count INTEGER NOT NULL DEFAULT 0 CHECK (senior_count >= 0),
+    infant_count INTEGER NOT NULL DEFAULT 0 CHECK (infant_count >= 0),
     commission_percentage NUMERIC(5, 2) NOT NULL CHECK (commission_percentage >= 0 AND commission_percentage <= 100),
     customer_name VARCHAR(255) NOT NULL,
     customer_email VARCHAR(255),
@@ -42,6 +46,10 @@ COMMENT ON COLUMN ops.booking.activity_schedule_id IS 'Referencia a la planeaci�
 COMMENT ON COLUMN ops.booking.company_id IS 'Referencia a la compañía (socio) que trajo el cliente (opcional)';
 COMMENT ON COLUMN ops.booking.transport_id IS 'Referencia al transporte asignado (opcional)';
 COMMENT ON COLUMN ops.booking.number_of_people IS 'Cantidad de personas en la reserva';
+COMMENT ON COLUMN ops.booking.adult_count IS 'Cantidad de adultos en la reserva';
+COMMENT ON COLUMN ops.booking.child_count IS 'Cantidad de niños en la reserva';
+COMMENT ON COLUMN ops.booking.senior_count IS 'Cantidad de adultos mayores en la reserva';
+COMMENT ON COLUMN ops.booking.infant_count IS 'Cantidad de infantes menores a 6 años incluidos en la reserva (precio 0)';
 COMMENT ON COLUMN ops.booking.commission_percentage IS 'Porcentaje de comisión (puede ser de la compañía o manual)';
 COMMENT ON COLUMN ops.booking.customer_name IS 'Nombre del cliente';
 COMMENT ON COLUMN ops.booking.customer_email IS 'Email del cliente (opcional)';
