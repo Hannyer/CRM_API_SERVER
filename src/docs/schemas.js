@@ -518,8 +518,8 @@ module.exports = {
           seniorPrice: { type: 'number', format: 'decimal', example: 40.00, description: 'Precio para adultos mayores' },
           scheduledStart: { type: 'string', format: 'date-time', example: '2024-12-25T08:00:00Z', description: 'Fecha y hora de inicio programada' },
           scheduledEnd: { type: 'string', format: 'date-time', example: '2024-12-25T10:00:00Z', description: 'Fecha y hora de fin programada' },
-          activityTypeId: { type: 'string', format: 'uuid', example: '123e4567-e89b-12d3-a456-426614174000', description: 'ID del tipo de actividad' },
-          activityTypeName: { type: 'string', example: 'Canopy', description: 'Nombre del tipo de actividad' },
+          activityTypeId: { type: 'string', format: 'uuid', nullable: true, example: null, description: 'ID del tipo de actividad' },
+          activityTypeName: { type: 'string', nullable: true, example: null, description: 'Nombre del tipo de actividad' },
           activityTypeDescription: { type: 'string', nullable: true, example: 'Tour de canopy por las copas de los árboles', description: 'Descripción del tipo de actividad' },
           guides: {
             type: 'array',
@@ -560,8 +560,8 @@ module.exports = {
           seniorPrice: { type: 'number', format: 'decimal', example: 40.00, description: 'Precio para adultos mayores' },
           scheduledStart: { type: 'string', format: 'date-time', example: '2024-12-25T08:00:00Z', description: 'Fecha y hora de inicio programada' },
           scheduledEnd: { type: 'string', format: 'date-time', example: '2024-12-25T10:00:00Z', description: 'Fecha y hora de fin programada' },
-          activityTypeId: { type: 'string', format: 'uuid', example: '123e4567-e89b-12d3-a456-426614174000', description: 'ID del tipo de actividad' },
-          activityTypeName: { type: 'string', example: 'Canopy', description: 'Nombre del tipo de actividad' },
+          activityTypeId: { type: 'string', format: 'uuid', nullable: true, example: null, description: 'ID del tipo de actividad' },
+          activityTypeName: { type: 'string', nullable: true, example: null, description: 'Nombre del tipo de actividad' },
         },
       },
 
@@ -575,17 +575,17 @@ module.exports = {
           childPrice: { type: 'number', format: 'decimal', example: 25.00, description: 'Precio para niños' },
           seniorPrice: { type: 'number', format: 'decimal', example: 40.00, description: 'Precio para adultos mayores' },
           status: { type: 'boolean', example: true, description: 'Estado de la actividad' },
-          activityTypeId: { type: 'string', format: 'uuid', example: '123e4567-e89b-12d3-a456-426614174000', description: 'ID del tipo de actividad' },
-          activityTypeName: { type: 'string', example: 'Canopy', description: 'Nombre del tipo de actividad' },
+          activityTypeId: { type: 'string', format: 'uuid', nullable: true, example: null, description: 'ID del tipo de actividad' },
+          activityTypeName: { type: 'string', nullable: true, example: null, description: 'Nombre del tipo de actividad' },
           activityTypeDescription: { type: 'string', nullable: true, example: 'Tour de canopy por las copas de los árboles', description: 'Descripción del tipo de actividad' },
         },
       },
 
       ActivityCreateRequest: {
         type: 'object',
-        required: ['activityTypeId', 'title', 'partySize'],
+        required: ['title', 'partySize'],
         properties: {
-          activityTypeId: { type: 'string', format: 'uuid', example: '123e4567-e89b-12d3-a456-426614174000', description: 'ID del tipo de actividad' },
+          activityTypeId: { type: 'string', format: 'uuid', nullable: true, example: null, description: 'ID del tipo de actividad' },
           title: { type: 'string', example: 'Tour Canopy - Grupo 1', description: 'Título de la actividad' },
           partySize: { type: 'integer', example: 20, description: 'Tamaño del grupo' },
           adultPrice: { type: 'number', format: 'decimal', example: 50.00, description: 'Precio para adultos' },
@@ -604,7 +604,7 @@ module.exports = {
       ActivityUpdateRequest: {
         type: 'object',
         properties: {
-          activityTypeId: { type: 'string', format: 'uuid', example: '123e4567-e89b-12d3-a456-426614174000', description: 'ID del tipo de actividad' },
+          activityTypeId: { type: 'string', format: 'uuid', nullable: true, example: null, description: 'ID del tipo de actividad' },
           title: { type: 'string', example: 'Tour Canopy - Grupo 1', description: 'Título de la actividad' },
           partySize: { type: 'integer', example: 20, description: 'Tamaño del grupo' },
           adultPrice: { type: 'number', format: 'decimal', example: 50.00, description: 'Precio para adultos' },

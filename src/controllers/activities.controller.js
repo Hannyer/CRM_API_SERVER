@@ -125,13 +125,13 @@ async function list(req, res) {
  *           schema:
  *             type: object
  *             required:
- *               - activityTypeId
  *               - title
  *               - partySize
  *             properties:
  *               activityTypeId:
  *                 type: string
  *                 format: uuid
+ *                 nullable: true
  *               title:
  *                 type: string
  *               partySize:
@@ -168,8 +168,8 @@ async function list(req, res) {
 async function create(req, res) {
   try {
     const payload = req.body || {};
-    if (!payload.activityTypeId || !payload.title || payload.partySize === undefined) {
-      return res.status(400).json({ message: 'activityTypeId, title, partySize son requeridos' });
+    if (!payload.title || payload.partySize === undefined) {
+      return res.status(400).json({ message: 'title, partySize son requeridos' });
     }
 
     const result = await activitiesService.createActivity(payload);
@@ -249,6 +249,7 @@ async function getById(req, res) {
  *               activityTypeId:
  *                 type: string
  *                 format: uuid
+ *                 nullable: true
  *               title:
  *                 type: string
  *               partySize:

@@ -132,7 +132,7 @@ async function getActivityById(activityId) {
         '[]'::json
       ) AS languages
     FROM ops.activity a
-    JOIN ops.activity_type at ON at.id = a.activity_type_id
+    LEFT JOIN ops.activity_type at ON at.id = a.activity_type_id
     WHERE a.id = $1::uuid
     `,
     [activityId]

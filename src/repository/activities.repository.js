@@ -11,7 +11,7 @@ async function createActivity({ activityTypeId, title, partySize, adultPrice, ch
     VALUES ($1::uuid, $2, $3::int, $4::numeric, $5::numeric, $6::numeric, $7::bool)
     RETURNING id, activity_type_id as "activityTypeId", title, party_size as "partySize", adult_price as "adultPrice", child_price as "childPrice", senior_price as "seniorPrice", status;
   `;
-  const params = [activityTypeId, title, partySize, adultPrice, childPrice, seniorPrice, status];
+  const params = [activityTypeId || null, title, partySize, adultPrice, childPrice, seniorPrice, status];
   const { rows } = await pool.query(sql, params);
   return rows[0];
 }
@@ -150,7 +150,7 @@ async function getActivitiesByDate(date) {
       ) AS languages
     FROM ops.activity_schedule s
     JOIN ops.activity a ON a.id = s.activity_id
-    JOIN ops.activity_type at ON at.id = a.activity_type_id
+    LEFT JOIN ops.activity_type at ON at.id = a.activity_type_id
     WHERE DATE(s.scheduled_start) = $1::date
       AND s.status = true
       AND a.status = true
@@ -202,7 +202,7 @@ async function listActivities({ page = 1, limit = 10, status = null } = {}) {
         WHERE s.activity_id = a.id AND s.status = true
       ) as "schedulesCount"
     FROM ops.activity a
-    JOIN ops.activity_type at ON at.id = a.activity_type_id
+    LEFT JOIN ops.activity_type at ON at.id = a.activity_type_id
     ${statusFilter}
     ORDER BY a.title ASC
     LIMIT $${paramIndex++} OFFSET $${paramIndex}
@@ -237,7 +237,7 @@ async function getActivityById(activityId) {
       at.name as "activityTypeName",
       at.description as "activityTypeDescription"
     FROM ops.activity a
-    JOIN ops.activity_type at ON at.id = a.activity_type_id
+    LEFT JOIN ops.activity_type at ON at.id = a.activity_type_id
     WHERE a.id = $1::uuid
     `,
     [activityId]
@@ -256,7 +256,7 @@ async function updateActivity(activityId, { activityTypeId, title, partySize, ad
 
   if (activityTypeId !== undefined) {
     updates.push(`activity_type_id = $${paramIndex++}::uuid`);
-    params.push(activityTypeId);
+    params.push(activityTypeId || null);
   }
   if (title !== undefined) {
     updates.push(`title = $${paramIndex++}`);

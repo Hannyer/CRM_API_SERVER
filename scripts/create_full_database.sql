@@ -156,7 +156,7 @@ CREATE INDEX IF NOT EXISTS idx_app_user_license_expiration_date ON ops.app_user_
 -- 3.1 Actividad
 CREATE TABLE IF NOT EXISTS ops.activity (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    activity_type_id UUID NOT NULL REFERENCES ops.activity_type(id) ON DELETE RESTRICT,
+    activity_type_id UUID REFERENCES ops.activity_type(id) ON DELETE RESTRICT,
     title TEXT NOT NULL,
     party_size INTEGER NOT NULL CHECK (party_size > 0),
     status BOOLEAN NOT NULL DEFAULT true,

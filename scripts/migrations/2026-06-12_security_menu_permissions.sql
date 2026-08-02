@@ -64,7 +64,7 @@ INSERT INTO ops.menu (code, name, description, icon, route_path, section, sort_o
 VALUES
   ('home', 'Inicio', 'Página principal', 'Home', '/home', NULL, 1, true),
   ('bookings', 'Reservas', 'Gestión de reservas', 'ClipboardList', '/bookings', 'Reservas', 10, true),
-  ('activity-types', 'Tipos de actividad', 'Catálogo de tipos', 'Tags', '/activity-types', 'Operación', 20, true),
+  ('activity-types', 'Tipos de actividad', 'Catálogo de tipos', 'Tags', '/activity-types', 'Operación', 20, false),
   ('activities', 'Actividades', 'Actividades turísticas', 'CalendarRange', '/activities', 'Operación', 30, true),
   ('schedules', 'Planeaciones', 'Horarios y planeaciones', 'CalendarClock', '/schedules', 'Operación', 40, true),
   ('transports', 'Transportes', 'Unidades de transporte', 'BusFront', '/transports', 'Operación', 50, true),
