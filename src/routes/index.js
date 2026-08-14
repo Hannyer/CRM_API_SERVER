@@ -16,6 +16,8 @@ const menuRoutes = require('./menu.routes');
 const securityRoutes = require('./security.routes');
 const bookingAssignmentsRoutes = require('./booking-assignments.routes');
 const referencePointsRoutes = require('./reference-points.routes');
+const calendarRoutes = require('./calendar.routes');
+const reportsRoutes = require('./reports.routes');
 
 const router = Router();
  
@@ -36,6 +38,8 @@ router.use('/menu', menuRoutes);
 router.use('/security', securityRoutes);
 router.use('/booking-assignments', bookingAssignmentsRoutes);
 router.use('/reference-points', referencePointsRoutes);
+router.use('/calendar', calendarRoutes);
+router.use('/reports', reportsRoutes);
 
 
 module.exports = router;

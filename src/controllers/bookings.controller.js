@@ -609,7 +609,9 @@ async function list(req, res) {
     let limit = parseInt(req.query.limit, 10) || 10;
     const status = req.query.status || null;
     const activityScheduleId = req.query.activityScheduleId || null;
-    
+    const search = req.query.search || null;
+    const orderBy = req.query.orderBy || null;
+
     if (page < 1) {
       return sendErrorResponse(res, { status: 400, message: 'page debe ser mayor o igual a 1' });
     }
@@ -620,7 +622,7 @@ async function list(req, res) {
       return sendErrorResponse(res, { status: 400, message: 'limit no puede ser mayor a 100' });
     }
     
-    const data = await bookingsService.listBookings({ page, limit, status, activityScheduleId });
+    const data = await bookingsService.listBookings({ page, limit, status, activityScheduleId, search, orderBy });
     
     res.json({
       items: data.items,

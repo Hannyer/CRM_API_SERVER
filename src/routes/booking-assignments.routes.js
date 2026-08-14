@@ -1,6 +1,7 @@
 // src/routes/booking-assignments.routes.js
 const { Router } = require('express');
 const ctrl = require('../controllers/booking-assignments.controller');
+const calendarCtrl = require('../controllers/calendar.controller');
 const { verifyToken, requirePermission } = require('../middlewares/auth.middleware');
 
 const router = Router();
@@ -13,7 +14,12 @@ router.get('/drivers/available', requirePermission('operator'), ctrl.getAvailabl
 
 // Módulos personales para guías y conductores
 router.get('/me/guide', ctrl.listMyGuideAssignments);
+router.get('/me/guide/schedules/:activityScheduleId/bookings', ctrl.listMyGuideScheduleBookings);
+router.get('/me/guide/calendar-token', calendarCtrl.getMyCalendarToken);
+router.post('/me/guide/calendar-token/regenerate', calendarCtrl.regenerateMyCalendarToken);
 router.get('/me/driver', ctrl.listMyDriverAssignments);
+router.get('/me/driver/calendar-token', calendarCtrl.getMyDriverCalendarToken);
+router.post('/me/driver/calendar-token/regenerate', calendarCtrl.regenerateMyDriverCalendarToken);
 
 // Submódulo de salidas con guías asignados
 router.get('/schedules/guides', requirePermission('operator'), ctrl.listScheduleGuideAssignments);

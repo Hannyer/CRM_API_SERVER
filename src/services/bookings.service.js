@@ -219,8 +219,8 @@ async function createBooking(payload) {
 /**
  * Lista todas las reservas con paginación
  */
-async function listBookings({ page, limit, status, activityScheduleId } = {}) {
-  return bookingsRepo.listBookings({ page, limit, status, activityScheduleId });
+async function listBookings({ page, limit, status, activityScheduleId, search, orderBy } = {}) {
+  return bookingsRepo.listBookings({ page, limit, status, activityScheduleId, search, orderBy });
 }
 
 /**

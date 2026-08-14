@@ -277,6 +277,22 @@ async function listMyDriverAssignments(req, res) {
   }
 }
 
+async function listMyGuideScheduleBookings(req, res) {
+  try {
+    const bookings = await assignmentsService.listMyScheduleBookings(
+      req.user.id,
+      req.params.activityScheduleId
+    );
+    res.json(bookings);
+  } catch (e) {
+    console.error(e);
+    if (e instanceof AppError) {
+      return res.status(e.status).json({ message: e.message, code: e.code });
+    }
+    sendErrorResponse(res, e, 500, 'Error al obtener las reservas de la salida');
+  }
+}
+
 /**
  * @openapi
  * /api/booking-assignments/{bookingId}/confirm:
@@ -324,6 +340,7 @@ module.exports = {
   listBookingTransportAssignments,
   listMyGuideAssignments,
   listMyDriverAssignments,
+  listMyGuideScheduleBookings,
   getAssignments,
   assignGuides,
   assignTransport,

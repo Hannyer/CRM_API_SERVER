@@ -235,9 +235,18 @@ async function createBooking({
 /**
  * Lista todas las reservas con paginación
  */
-async function listBookings({ page = 1, limit = 10, status = null, activityScheduleId = null } = {}) {
+// Ordenes permitidos (whitelist para evitar inyeccion en el ORDER BY).
+const BOOKING_ORDER_BY = {
+  schedule_asc: 's.scheduled_start ASC, b.created_at DESC',
+  schedule_desc: 's.scheduled_start DESC, b.created_at DESC',
+  created_desc: 'b.created_at DESC',
+  created_asc: 'b.created_at ASC',
+  customer_asc: 'b.customer_name ASC',
+};
+
+async function listBookings({ page = 1, limit = 10, status = null, activityScheduleId = null, search = null, orderBy = 'schedule_asc' } = {}) {
   const offset = (page - 1) * limit;
-  
+
   const conditions = [];
   const params = [];
   let paramIndex = 1;
@@ -250,12 +259,34 @@ async function listBookings({ page = 1, limit = 10, status = null, activitySched
     conditions.push(`b.activity_schedule_id = $${paramIndex++}::uuid`);
     params.push(activityScheduleId);
   }
+  if (search && String(search).trim() !== '') {
+    // Busqueda por palabras: cada palabra debe aparecer en algun campo.
+    // Tolera espacios de mas, cualquier orden y tildes ("sarapiqui" = "Sarapiqui").
+    const haystack =
+      "translate((b.customer_name || ' ' || a.title || ' ' || COALESCE(c.name,'') || ' ' || COALESCE(b.customer_email,'')), 'áéíóúÁÉÍÓÚüÜñÑ', 'aeiouAEIOUuUnN')";
+    const tokens = String(search)
+      .trim()
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .split(/\s+/);
+    for (const token of tokens) {
+      conditions.push(`${haystack} ILIKE $${paramIndex}`);
+      params.push(`%${token}%`);
+      paramIndex++;
+    }
+  }
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  const orderClause = BOOKING_ORDER_BY[orderBy] || BOOKING_ORDER_BY.schedule_asc;
 
-  // Obtener el total de registros
+  // El total usa los mismos JOIN para que la busqueda por actividad/compania cuente bien.
   const countResult = await pool.query(
-    `SELECT COUNT(*) as total FROM ops.booking b ${whereClause}`,
+    `SELECT COUNT(*) as total
+       FROM ops.booking b
+       JOIN ops.activity_schedule s ON s.id = b.activity_schedule_id
+       JOIN ops.activity a ON a.id = s.activity_id
+       LEFT JOIN ops.company c ON c.id = b.company_id
+     ${whereClause}`,
     params
   );
   const total = parseInt(countResult.rows[0].total, 10);
@@ -306,7 +337,7 @@ async function listBookings({ page = 1, limit = 10, status = null, activitySched
     LEFT JOIN ops.payment_type pt ON pt.id = b.payment_type_id
     LEFT JOIN ops.card_type ct ON ct.id = b.card_type_id
     ${whereClause}
-    ORDER BY s.scheduled_start ASC, b.created_at DESC
+    ORDER BY ${orderClause}
     LIMIT $${paramIndex++} OFFSET $${paramIndex}
     `,
     [...params, limit, offset]

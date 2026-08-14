@@ -224,6 +224,21 @@ async function listMyDriverAssignments(userId, filters = {}) {
 }
 
 /**
+ * Lista las reservas de una salida para el guía autenticado.
+ * Solo se permite si el guía está asignado a ese horario.
+ */
+async function listMyScheduleBookings(userId, activityScheduleId) {
+  if (!activityScheduleId) {
+    throw new AppError('activityScheduleId es requerido', 400);
+  }
+  const assigned = await assignmentsRepo.isGuideAssignedToSchedule(activityScheduleId, userId);
+  if (!assigned) {
+    throw new AppError('No tienes acceso a las reservas de esta salida', 403);
+  }
+  return assignmentsRepo.listBookingsBySchedule(activityScheduleId);
+}
+
+/**
  * Confirma una reserva cambiando su estado a 'confirmed'
  * Validaciones:
  * - La reserva debe estar en estado 'pending'
@@ -303,5 +318,6 @@ module.exports = {
   assignTransport,
   listMyGuideAssignments,
   listMyDriverAssignments,
+  listMyScheduleBookings,
   confirmBooking,
 };

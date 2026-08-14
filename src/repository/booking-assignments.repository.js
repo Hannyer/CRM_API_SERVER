@@ -500,6 +500,56 @@ async function confirmBooking(bookingId) {
   return rows[0] || null;
 }
 
+/**
+ * Indica si un guía (app_user) está asignado a un horario específico.
+ */
+async function isGuideAssignedToSchedule(activityScheduleId, guideUserId) {
+  const { rows } = await pool.query(
+    `SELECT 1
+       FROM ops.activity_schedule_guide
+      WHERE activity_schedule_id = $1::uuid
+        AND guide_id = $2::uuid
+      LIMIT 1`,
+    [activityScheduleId, guideUserId]
+  );
+  return rows.length > 0;
+}
+
+/**
+ * Lista las reservas (pending/confirmed) de un horario, con los datos que
+ * necesita ver el guía. El modelo no guarda pasajeros individuales: cada
+ * reserva tiene un nombre de cliente y el desglose por categoría.
+ */
+async function listBookingsBySchedule(activityScheduleId) {
+  const { rows } = await pool.query(
+    `
+    SELECT
+      b.id,
+      b.customer_name as "customerName",
+      b.customer_phone as "customerPhone",
+      b.customer_email as "customerEmail",
+      b.number_of_people as "numberOfPeople",
+      b.adult_count as "adultCount",
+      b.child_count as "childCount",
+      b.senior_count as "seniorCount",
+      b.infant_count as "infantCount",
+      b.status,
+      b.comment,
+      b.transport,
+      b.passenger_count as "passengerCount",
+      b.reference_point_description as "referencePointDescription",
+      c.name as "companyName"
+    FROM ops.booking b
+    LEFT JOIN ops.company c ON c.id = b.company_id
+    WHERE b.activity_schedule_id = $1::uuid
+      AND b.status IN ('pending', 'confirmed')
+    ORDER BY b.customer_name ASC
+    `,
+    [activityScheduleId]
+  );
+  return rows;
+}
+
 module.exports = {
   getAssignmentsByBookingId,
   getAvailableGuides,
@@ -514,5 +564,7 @@ module.exports = {
   setBookingTransport,
   listGuideAssignmentsByUser,
   listDriverAssignmentsByUser,
+  isGuideAssignedToSchedule,
+  listBookingsBySchedule,
   confirmBooking,
 };
