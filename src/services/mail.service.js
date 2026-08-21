@@ -29,7 +29,11 @@ function getTransporter() {
   const key = `${user}:${pass}`;
   if (!transporter || transporterKey !== key) {
     transporter = nodemailer.createTransport({
-      service: 'gmail',
+      host: 'smtp.gmail.com',
+      port: 587,
+      secure: false,
+      requireTLS: true,
+      family: 4,
       auth: { user, pass },
     });
     transporterKey = key;
