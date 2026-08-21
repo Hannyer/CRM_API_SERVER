@@ -1,7 +1,9 @@
 // src/controllers/auth.controller.js
 const userService = require('../services/users.service');
 const configService = require('../services/config.service');
-const { decrypt, encrypt } = require('../utils/crypto-compat');
+const passwordResetService = require('../services/password-reset.service');
+const { decrypt } = require('../utils/crypto-compat');
+const { AppError } = require('../utils/AppError');
 
 /**
  * @openapi
@@ -37,21 +39,16 @@ async function login(req, res) {
       res.status(401).json({ message: 'Credenciales incorrectas. Por favor, verifica tu usuario y contraseña.' });
 
     const { username = '', password = '' } = req.body || {};
-    console.log(encrypt(password));
     const user = await userService.findByEmail(username);
 
     if (!user) return unauthorized();
 
     let storedPlain;
     try {
-
       storedPlain = decrypt(user.password_hash);
-    } catch (e) {
-      console.log("Error:  " + e.message);
+    } catch {
       return unauthorized();
     }
-    console.log(storedPlain)
-    console.log(password)
     if (storedPlain !== password) return unauthorized();
     if (!user.status) return unauthorized();
 
@@ -92,4 +89,32 @@ async function login(req, res) {
   }
 }
 
-module.exports = { login };
+async function requestPasswordReset(req, res) {
+  try {
+    const { email = '' } = req.body || {};
+    const result = await passwordResetService.requestPasswordReset(email);
+    return res.json(result);
+  } catch (e) {
+    console.error(e);
+    if (e instanceof AppError) {
+      return res.status(e.status).json({ message: e.message, code: e.code });
+    }
+    return res.status(500).json({ message: 'Error al solicitar recuperacion de contrasena' });
+  }
+}
+
+async function resetPassword(req, res) {
+  try {
+    const { token = '', newPassword = '' } = req.body || {};
+    const result = await passwordResetService.resetPassword({ token, newPassword });
+    return res.json(result);
+  } catch (e) {
+    console.error(e);
+    if (e instanceof AppError) {
+      return res.status(e.status).json({ message: e.message, code: e.code });
+    }
+    return res.status(500).json({ message: 'Error al restablecer contrasena' });
+  }
+}
+
+module.exports = { login, requestPasswordReset, resetPassword };

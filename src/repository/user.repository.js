@@ -194,6 +194,50 @@ async function getUserByEmail(email) {
   return rows[0] || null;
 }
 
+async function setPasswordResetToken(userId, tokenHash, expiresAt) {
+  await pool.query(
+    `
+    UPDATE ops.app_user
+    SET password_reset_token_hash = $2,
+        password_reset_expires_at = $3,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = $1::uuid
+    `,
+    [userId, tokenHash, expiresAt]
+  );
+}
+
+async function getUserByPasswordResetToken(tokenHash) {
+  const { rows } = await pool.query(
+    `
+    SELECT id, email, full_name, status
+    FROM ops.app_user
+    WHERE password_reset_token_hash = $1
+      AND password_reset_expires_at > CURRENT_TIMESTAMP
+      AND status = true
+    LIMIT 1
+    `,
+    [tokenHash]
+  );
+  return rows[0] || null;
+}
+
+async function updatePasswordById(userId, passwordHash) {
+  const { rows } = await pool.query(
+    `
+    UPDATE ops.app_user
+    SET password_hash = $2,
+        password_reset_token_hash = NULL,
+        password_reset_expires_at = NULL,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = $1::uuid
+    RETURNING id
+    `,
+    [userId, passwordHash]
+  );
+  return rows[0] || null;
+}
+
 async function updateUser(userId, data) {
   const hasLanguageUpdate = data.languageIds !== undefined || data.clearLanguages;
   const hasLicenseUpdate = data.licenses !== undefined || data.clearLicenses;
@@ -305,6 +349,9 @@ module.exports = {
   createUser,
   getUserById,
   getUserByEmail,
+  setPasswordResetToken,
+  getUserByPasswordResetToken,
+  updatePasswordById,
   updateUser,
   deleteUser,
 };

@@ -113,6 +113,8 @@ CREATE TABLE IF NOT EXISTS ops.app_user (
     full_name TEXT NOT NULL,
     phone VARCHAR(30) NOT NULL,
     password_hash TEXT,
+    password_reset_token_hash TEXT,
+    password_reset_expires_at TIMESTAMPTZ,
     role ops.app_user_role NOT NULL,
     speaks_english BOOLEAN NOT NULL DEFAULT false,
     status BOOLEAN NOT NULL DEFAULT true,
@@ -122,6 +124,9 @@ CREATE TABLE IF NOT EXISTS ops.app_user (
     CONSTRAINT app_user_cedula_key UNIQUE (cedula)
 );
 CREATE INDEX IF NOT EXISTS idx_app_user_status ON ops.app_user(status);
+CREATE INDEX IF NOT EXISTS idx_app_user_password_reset_token_hash
+    ON ops.app_user (password_reset_token_hash)
+    WHERE password_reset_token_hash IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_app_user_role ON ops.app_user(role);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_app_user_cedula_unique
     ON ops.app_user (UPPER(TRIM(cedula)));

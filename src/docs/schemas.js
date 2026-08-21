@@ -229,13 +229,13 @@ module.exports = {
 
       UserCreateRequest: {
         type: 'object',
-        required: ['cedula', 'email', 'fullName', 'phone', 'password', 'roleId', 'languageIds'],
+        required: ['cedula', 'email', 'fullName', 'phone', 'roleId', 'languageIds'],
         properties: {
           cedula: { type: 'string', example: '1-2345-6789' },
           email: { type: 'string', format: 'email', example: 'usuario@correo.com' },
           fullName: { type: 'string', example: 'Juan Pérez' },
           phone: { type: 'string', example: '+506 8888-8888' },
-          password: { type: 'string', example: '123456' },
+          password: { type: 'string', description: 'Opcional. Si no se envia, el sistema manda un enlace por correo para crearla.' },
           roleId: { type: 'string', format: 'uuid', description: 'ID del rol. Ver GET /api/roles/select' },
           licenses: {
             type: 'array',

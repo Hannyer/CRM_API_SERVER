@@ -2,6 +2,8 @@ const usersRepo = require('../repository/user.repository');
 const userLanguagesRepo = require('../repository/user-languages.repository');
 const userLicensesRepo = require('../repository/user-licenses.repository');
 const rolesService = require('./roles.service');
+const passwordResetService = require('./password-reset.service');
+const { isMailConfigured } = require('./mail.service');
 const { AppError } = require('../utils/AppError');
 const { encrypt } = require('../utils/crypto-compat');
 
@@ -230,10 +232,18 @@ async function createUser(payload) {
   validateEmail(email);
   validateRequiredText(fullName, 'fullName');
   validateRequiredText(phone, 'phone');
-  validateRequiredText(password, 'password');
   validateRoleId(roleId);
   validateSpeaksEnglish(speaksEnglish);
   validateStatus(status);
+
+  const hasPassword = typeof password === 'string' && password.trim() !== '';
+  if (!hasPassword && !isMailConfigured()) {
+    throw new AppError(
+      'Servicio de correo no configurado. Configure GMAIL_USER y GMAIL_APP_PASSWORD para crear usuarios sin contrasena.',
+      503,
+      'MAIL_NOT_CONFIGURED'
+    );
+  }
 
   await assertValidRoleId(roleId);
 
@@ -245,18 +255,29 @@ async function createUser(payload) {
   const normalizedCedula = await assertUniqueCedula(cedula);
   const normalizedEmail = await assertUniqueEmail(email);
 
-  return usersRepo.createUser({
+  const createdUser = await usersRepo.createUser({
     cedula: normalizedCedula,
     email: normalizedEmail,
     fullName: fullName.trim(),
     phone: phone.trim(),
-    passwordHash: encrypt(password),
+    passwordHash: hasPassword ? encrypt(password) : null,
     roleId: roleId.trim(),
     speaksEnglish: !!speaksEnglish,
     status: status !== false,
     languageIds: resolvedLanguageIds,
     licenses: resolvedLicenses,
   });
+
+  let passwordSetupEmailSent = false;
+  if (!hasPassword && createdUser?.status !== false) {
+    try {
+      passwordSetupEmailSent = await passwordResetService.sendPasswordSetupLink(createdUser);
+    } catch (e) {
+      console.error('No se pudo enviar el enlace de creacion de contrasena:', e.message);
+    }
+  }
+
+  return { ...createdUser, passwordSetupEmailSent };
 }
 
 async function findByEmail(email) {

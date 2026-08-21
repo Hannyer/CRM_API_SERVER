@@ -1,6 +1,7 @@
 const bookingsRepo = require('../repository/bookings.repository');
 const companiesRepo = require('../repository/companies.repository');
 const referencePointsRepo = require('../repository/reference-points.repository');
+const { sendBookingInvoiceEmail } = require('./booking-email.service');
 const { AppError } = require('../utils/AppError');
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -213,7 +214,15 @@ async function createBooking(payload) {
     createdBy
   });
 
-  return booking;
+  const detailedBooking = await bookingsRepo.getBookingById(booking.id);
+  let invoiceEmailSent = false;
+  try {
+    invoiceEmailSent = await sendBookingInvoiceEmail(detailedBooking || booking);
+  } catch (e) {
+    console.error('No se pudo enviar la factura de la reserva:', e.message);
+  }
+
+  return { ...booking, invoiceEmailSent };
 }
 
 /**
