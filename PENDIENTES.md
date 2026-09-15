@@ -1,5 +1,5 @@
 # CoreLink — Pendientes y próximos pasos
-_Actualizado: 2026-08-14_
+_Actualizado: 2026-09-14_
 
 > Para retomar: leer la sección **"Empezar por acá"** y arrancar directo.
 
@@ -7,7 +7,7 @@ _Actualizado: 2026-08-14_
 
 ## ▶️ Empezar por acá (lo primero la próxima vez)
 1. **`JWT_SECRET` en Render** — 5 minutos, riesgo crítico. Si no está seteado, el API firma tokens con un valor por defecto **público** (`'super-secret-default-key'` en `src/middlewares/auth.middleware.js`). Cualquiera podría forjar un token de admin. Setearlo en la UI de Render y hacer que el server NO arranque si falta.
-2. **Transacción anti-sobreventa** — bug real comprobado (dos reservas simultáneas pasaron 12/10). Meter la creación de reservas en una transacción con `SELECT ... FOR UPDATE`. Ver detalle abajo.
+2. ~~Transacción anti-sobreventa~~ — ✅ **HECHO (2026-09-14)**. `createBooking` ya usa transacción con `SELECT ... FOR UPDATE`. Verificado: 4/4 escenarios de concurrencia sin sobreventa.
 
 ---
 
@@ -21,7 +21,9 @@ _Actualizado: 2026-08-14_
 - **RLS apagado** en las tablas de `ops` (y `inv`). Con Supabase, habilitar RLS si se expone PostgREST/anon key.
 
 ## 🟠 Correctitud — sobreventa / capacidad
-- **Race condition**: `src/repository/bookings.repository.js` crea reservas con `pool.query` suelto (lee disponibilidad y luego inserta, sin transacción). Falta `pool.connect()` + `BEGIN`/`FOR UPDATE`/`COMMIT`. Aplica también a editar y cancelar (decrementar).
+- ✅ **Race condition al CREAR: RESUELTA (2026-09-14)**. `createBooking` abre transacción, bloquea el horario con `FOR UPDATE` y revalida el cupo dentro. Probado con 2, 5 y 10 peticiones simultáneas: 0 sobreventas.
+- ✅ **Sobreventa al EDITAR: RESUELTA (2026-09-14)**. `availableSpaces` llegaba como texto y `+=` concatenaba ("8"+2="82"), así que no bloqueaba. Se fuerza a número.
+- ⚠️ **Pendiente menor**: `updateBooking` revalida el cupo pero **sin** transacción/bloqueo, así que dos ediciones simultáneas sobre la misma salida siguen teniendo una carrera teórica (mucho menos probable que la de crear).
 - **Dos modelos de capacidad en paralelo**:
   - Vivo: `activity.party_size − SUM(reservas)` (lo que valida hoy).
   - Muerto: columnas `activity_schedule.capacity` / `booked_count` → `capacity=0` en los 113 horarios históricos (el front no manda `capacity` en el bulk) y `booked_count` nunca se incrementa. Por eso `GET /api/activities/:id/schedules/available` devuelve vacío (filtra `(capacity-booked_count)>0`).
