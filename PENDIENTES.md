@@ -6,15 +6,34 @@ _Actualizado: 2026-09-14_
 ---
 
 ## ▶️ Empezar por acá (lo primero la próxima vez)
-1. **🔴 ACCIÓN MANUAL PENDIENTE: setear `JWT_SECRET` en Render**. El código ya exige la variable y **el API no arranca sin ella** (`src/config/jwt.js`). Si se despliega a Render sin setearla, el servicio queda caído. El secreto nuevo está en el `.env` local (no se sube a git): copiarlo de ahí a Render → Environment → Add Environment Variable. **Ojo:** al cambiar el secreto se invalidan todas las sesiones activas; todos tendrán que volver a iniciar sesión una vez.
-2. Siguiente en la lista: **CORS doble en `app.js`** (el `app.use(cors())` abierto de la línea ~10 gana sobre la allowlist).
-3. ~~Transacción anti-sobreventa~~ — ✅ **HECHO (2026-09-14)**. `createBooking` ya usa transacción con `SELECT ... FOR UPDATE`. Verificado: 4/4 escenarios de concurrencia sin sobreventa.
-4. ~~7 rutas sin `verifyToken`~~ — ✅ **HECHO (2026-09-14)**. Verificado: las 7 responden 401 sin token.
+
+### 1. 🔴 `JWT_SECRET` en Render — **pendiente, requiere coordinación**
+Hoy el API firma los tokens con `'super-secret-default-key'`, un valor que está **publicado en este repositorio**. Cualquiera que lo lea puede fabricarse un token de administrador contra producción. Es el riesgo más grave abierto.
+
+Ya está todo listo en código (`src/config/jwt.js`); son **dos variables de entorno**, cero cambios de código:
+
+1. Copiar el valor de `JWT_SECRET` del `.env` local (96 caracteres hex; el `.env` no se sube a git). Si se perdió, generar otro:
+   `node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"`
+2. Render → el servicio → **Environment** → agregar `JWT_SECRET` con ese valor.
+3. Agregar también `JWT_STRICT=true`. Eso hace que el server **se niegue a arrancar** si algún día falta el secreto, en vez de caer callado al valor inseguro.
+4. Guardar (Render redespliega solo) y verificar que el login funcione.
+
+⚠️ **Por qué no se hizo ya:** al cambiar el secreto **se invalidan todas las sesiones activas** y cada usuario debe iniciar sesión una vez más. Hay que hacerlo en un momento que no estorbe la operación.
+
+Mientras tanto el API arranca normal y escribe en los logs de Render:
+`[SEGURIDAD] JWT_SECRET no esta definido: se estan firmando los tokens con un valor por defecto PUBLICO...`
+
+### 2. Siguiente: CORS doble en `app.js`
+El `app.use(cors())` abierto de la línea ~10 gana sobre la allowlist.
+
+### ✅ Ya resueltos
+- ~~Transacción anti-sobreventa~~ — **HECHO (2026-09-14)**. `createBooking` usa `SELECT ... FOR UPDATE`. Verificado: 4/4 escenarios de concurrencia.
+- ~~7 rutas sin `verifyToken`~~ — **HECHO (2026-09-14)**. Verificado: las 7 responden 401 sin token.
 
 ---
 
 ## 🔴 Seguridad (crítico)
-- ✅ **JWT_SECRET: RESUELTO en código (2026-09-14)**. Se eliminó el fallback público `'super-secret-default-key'`. Ahora hay un solo punto de verdad, `src/config/jwt.js`, que valida al arrancar y **lanza excepción** si la variable falta o trae un valor por defecto conocido (avisa por consola si mide menos de 32 caracteres). Lo consumen `auth.middleware.js` (verificar) y `auth.controller.js` (firmar). **Falta la acción manual en Render** (ver "Empezar por acá").
+- 🔴 **JWT_SECRET: PENDIENTE (acción manual en Render)**. El fallback público `'super-secret-default-key'` **sigue activo**: se dejó a propósito el 2026-09-14 para no tumbar producción ni forzar el re-login de todos. `src/config/jwt.js` centraliza el secreto y corre en **modo permisivo** (arranca igual, pero grita en los logs). Para cerrarlo: setear `JWT_SECRET` y `JWT_STRICT=true` en Render — ver "Empezar por acá".
 - ✅ **7 rutas sin `verifyToken`: RESUELTO (2026-09-14)**. `activity-types`, `card-types`, `companies`, `config`, `languages`, `payment-types` y `security` llevan `router.use(verifyToken)`. Antes `companies` exponía el % de comisión y `security` la matriz de permisos completa sin autenticación. Verificado: las 7 devuelven 401 sin token y siguen respondiendo 200 con token. El front no se ve afectado (Login y Recuperar contraseña solo llaman `/api/auth/*`).
 - **CORS**: hay dos `app.use(cors())` en `app.js`; el abierto (línea ~10) gana sobre la allowlist (después de las rutas). Dejar solo la allowlist, antes de las rutas. **← siguiente pendiente de seguridad.**
 - **Contraseñas AES reversibles** (24 chars, longitud uniforme) → migrar a hash unidireccional (bcrypt/argon2), rehasheando en el próximo login exitoso.
