@@ -1,7 +1,11 @@
 const { Router } = require('express');
 const ctrl = require('../controllers/companies.controller');
+const { verifyToken } = require('../middlewares/auth.middleware');
 
 const router = Router();
+
+// Todas las rutas de este modulo requieren sesion iniciada.
+router.use(verifyToken);
 
 // Rutas para compañías
 router.get('/', ctrl.list);

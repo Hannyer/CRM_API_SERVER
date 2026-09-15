@@ -6,15 +6,17 @@ _Actualizado: 2026-09-14_
 ---
 
 ## ▶️ Empezar por acá (lo primero la próxima vez)
-1. **`JWT_SECRET` en Render** — 5 minutos, riesgo crítico. Si no está seteado, el API firma tokens con un valor por defecto **público** (`'super-secret-default-key'` en `src/middlewares/auth.middleware.js`). Cualquiera podría forjar un token de admin. Setearlo en la UI de Render y hacer que el server NO arranque si falta.
-2. ~~Transacción anti-sobreventa~~ — ✅ **HECHO (2026-09-14)**. `createBooking` ya usa transacción con `SELECT ... FOR UPDATE`. Verificado: 4/4 escenarios de concurrencia sin sobreventa.
+1. **🔴 ACCIÓN MANUAL PENDIENTE: setear `JWT_SECRET` en Render**. El código ya exige la variable y **el API no arranca sin ella** (`src/config/jwt.js`). Si se despliega a Render sin setearla, el servicio queda caído. El secreto nuevo está en el `.env` local (no se sube a git): copiarlo de ahí a Render → Environment → Add Environment Variable. **Ojo:** al cambiar el secreto se invalidan todas las sesiones activas; todos tendrán que volver a iniciar sesión una vez.
+2. Siguiente en la lista: **CORS doble en `app.js`** (el `app.use(cors())` abierto de la línea ~10 gana sobre la allowlist).
+3. ~~Transacción anti-sobreventa~~ — ✅ **HECHO (2026-09-14)**. `createBooking` ya usa transacción con `SELECT ... FOR UPDATE`. Verificado: 4/4 escenarios de concurrencia sin sobreventa.
+4. ~~7 rutas sin `verifyToken`~~ — ✅ **HECHO (2026-09-14)**. Verificado: las 7 responden 401 sin token.
 
 ---
 
 ## 🔴 Seguridad (crítico)
-- **JWT_SECRET** con fallback público (ver arriba).
-- **CORS**: hay dos `app.use(cors())` en `app.js`; el abierto (línea ~10) gana sobre la allowlist (después de las rutas). Dejar solo la allowlist, antes de las rutas.
-- **7 rutas sin `verifyToken`**: `activity-types`, `card-types`, `companies`, `config`, `languages`, `payment-types`, `security`. `companies` expone % de comisión y `security` la matriz de permisos. Invertir a `verifyToken` global + excepciones (`/auth/login`, `/health`).
+- ✅ **JWT_SECRET: RESUELTO en código (2026-09-14)**. Se eliminó el fallback público `'super-secret-default-key'`. Ahora hay un solo punto de verdad, `src/config/jwt.js`, que valida al arrancar y **lanza excepción** si la variable falta o trae un valor por defecto conocido (avisa por consola si mide menos de 32 caracteres). Lo consumen `auth.middleware.js` (verificar) y `auth.controller.js` (firmar). **Falta la acción manual en Render** (ver "Empezar por acá").
+- ✅ **7 rutas sin `verifyToken`: RESUELTO (2026-09-14)**. `activity-types`, `card-types`, `companies`, `config`, `languages`, `payment-types` y `security` llevan `router.use(verifyToken)`. Antes `companies` exponía el % de comisión y `security` la matriz de permisos completa sin autenticación. Verificado: las 7 devuelven 401 sin token y siguen respondiendo 200 con token. El front no se ve afectado (Login y Recuperar contraseña solo llaman `/api/auth/*`).
+- **CORS**: hay dos `app.use(cors())` en `app.js`; el abierto (línea ~10) gana sobre la allowlist (después de las rutas). Dejar solo la allowlist, antes de las rutas. **← siguiente pendiente de seguridad.**
 - **Contraseñas AES reversibles** (24 chars, longitud uniforme) → migrar a hash unidireccional (bcrypt/argon2), rehasheando en el próximo login exitoso.
 - **`NODE_TLS_REJECT_UNAUTHORIZED=0`** global en `.env` — sobra (el pool ya usa `rejectUnauthorized:false`) y desactiva TLS de todo el proceso. Quitarlo.
 - **API conecta como `postgres`** (superusuario, `bypassrls=true`) → crear rol dedicado con permisos solo sobre esquema `ops`.

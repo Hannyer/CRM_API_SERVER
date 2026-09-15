@@ -1,7 +1,11 @@
 const { Router } = require('express');
 const ctrl = require('../controllers/config.controller');
+const { verifyToken } = require('../middlewares/auth.middleware');
 
 const router = Router();
+
+// Todas las rutas de este modulo requieren sesion iniciada.
+router.use(verifyToken);
 
 router.get('/by-keys', ctrl.listByKeys);
 router.get('/', ctrl.list);

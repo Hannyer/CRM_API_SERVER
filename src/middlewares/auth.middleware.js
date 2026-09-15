@@ -2,7 +2,7 @@ const jwt = require('jsonwebtoken');
 const securityService = require('../services/security.service');
 const { sendErrorResponse } = require('../utils/errorHandler');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-default-key';
+const { JWT_SECRET } = require('../config/jwt');
 
 /**
  * Middleware para verificar que la petición contenga un JWT válido.

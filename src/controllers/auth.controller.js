@@ -56,7 +56,7 @@ async function login(req, res) {
     const isExternal =
       rolClienteValue != null && String(user.role_id) === String(rolClienteValue);
 
-    const jwtSecret = process.env.JWT_SECRET || 'super-secret-default-key';
+    const { JWT_SECRET: jwtSecret } = require('../config/jwt');
     const jwt = require('jsonwebtoken');
     const token = jwt.sign(
       { id: user.id, roleId: user.role_id },
