@@ -228,8 +228,56 @@ async function createBooking({
     status,
     createdBy
   ];
-  const { rows } = await pool.query(sql, params);
-  return rows[0];
+  // Transaccion con bloqueo de la salida: evita sobreventa por reservas simultaneas.
+  // Sin FOR UPDATE, dos peticiones a la vez leen la misma disponibilidad y ambas insertan.
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 1) Bloquea la fila del horario: la 2da peticion espera aqui hasta que la 1ra confirme.
+    const locked = await client.query(
+      `SELECT s.id FROM ops.activity_schedule s WHERE s.id = $1::uuid AND s.status = true FOR UPDATE`,
+      [activityScheduleId]
+    );
+    if (locked.rowCount === 0) {
+      const err = new Error('Planeacion no encontrada o inactiva');
+      err.code = 'SCHEDULE_NOT_FOUND';
+      throw err;
+    }
+
+    // 2) Recalcula la disponibilidad DENTRO de la transaccion (ya ve lo que confirmo la otra).
+    const av = await client.query(
+      `SELECT a.party_size::int AS party_size,
+              COALESCE((
+                SELECT SUM(b.number_of_people)
+                FROM ops.booking b
+                WHERE b.activity_schedule_id = s.id
+                  AND b.status IN ('pending', 'confirmed')
+              ), 0)::int AS booked
+         FROM ops.activity_schedule s
+         JOIN ops.activity a ON a.id = s.activity_id
+        WHERE s.id = $1::uuid`,
+      [activityScheduleId]
+    );
+    const available = (av.rows[0].party_size || 0) - (av.rows[0].booked || 0);
+    if (available < Number(numberOfPeople)) {
+      const err = new Error('Sin cupos disponibles');
+      err.code = 'NO_CAPACITY';
+      err.available = available;
+      err.requested = Number(numberOfPeople);
+      throw err;
+    }
+
+    // 3) Inserta y libera el bloqueo al confirmar.
+    const { rows } = await client.query(sql, params);
+    await client.query('COMMIT');
+    return rows[0];
+  } catch (e) {
+    await client.query('ROLLBACK');
+    throw e;
+  } finally {
+    client.release();
+  }
 }
 
 /**

@@ -102,7 +102,7 @@ async function createBooking(payload) {
     throw new AppError('La planeación especificada no existe o no está disponible', 404);
   }
 
-  if (availability.availableSpaces < numberOfPeople) {
+  if (Number(availability.availableSpaces) < numberOfPeople) {
     throw new AppError(
       `No hay suficientes espacios disponibles. Espacios disponibles: ${availability.availableSpaces}, solicitados: ${numberOfPeople}`,
       400
@@ -185,8 +185,10 @@ async function createBooking(payload) {
   nonNegativeMoney('total', total);
   nonNegativeMoney('commissionAmount', commissionAmount);
 
-  // Crear la reserva
-  const booking = await bookingsRepo.createBooking({
+  // Crear la reserva (el repo revalida el cupo dentro de una transaccion con bloqueo)
+  let booking;
+  try {
+    booking = await bookingsRepo.createBooking({
     activityScheduleId,
     companyId,
     referencePointId: finalReferencePointId,
@@ -212,7 +214,19 @@ async function createBooking(payload) {
     customerPhone,
     status,
     createdBy
-  });
+    });
+  } catch (e) {
+    if (e && e.code === 'NO_CAPACITY') {
+      throw new AppError(
+        `No hay suficientes espacios disponibles. Espacios disponibles: ${e.available}, solicitados: ${e.requested}`,
+        400
+      );
+    }
+    if (e && e.code === 'SCHEDULE_NOT_FOUND') {
+      throw new AppError('La planeación especificada no existe o no está disponible', 404);
+    }
+    throw e;
+  }
 
   const detailedBooking = await bookingsRepo.getBookingById(booking.id);
   let invoiceEmailSent = false;
@@ -359,7 +373,8 @@ async function updateBooking(bookingId, payload) {
     }
 
     // Calcular espacios disponibles considerando la reserva actual si es la misma planeación
-    let availableSpaces = availability.availableSpaces;
+    // El repo devuelve availableSpaces como texto: forzar a numero o "+=" concatena.
+    let availableSpaces = Number(availability.availableSpaces) || 0;
     if (scheduleIdToCheck === booking.activityScheduleId) {
       // Si es la misma planeación, sumar las personas de esta reserva a los espacios disponibles
       availableSpaces += currentPeople;
