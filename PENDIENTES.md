@@ -2,6 +2,8 @@
 _Actualizado: 2026-09-14_
 
 > Para retomar: leer la sección **"Empezar por acá"** y arrancar directo.
+>
+> 📄 **¿Listo para comercializar?** Ver [EVALUACION-PRELANZAMIENTO.md](EVALUACION-PRELANZAMIENTO.md) — veredicto, bloqueantes y plan de ~1 semana.
 
 ---
 
