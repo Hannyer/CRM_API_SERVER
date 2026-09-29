@@ -1,10 +1,12 @@
 const { Router } = require('express');
 const ctrl = require('../controllers/bookings.controller');
 const { verifyToken, requirePermission } = require('../middlewares/auth.middleware');
+const { requireCrmEntitlement } = require('../middlewares/subscription.middleware');
 
 const router = Router();
 
 router.use(verifyToken);
+router.use(requireCrmEntitlement('bookings'));
 
 // Rutas para obtener información de disponibilidad
 router.get('/activities/:activityId/schedules', requirePermission('bookings'), ctrl.getAvailableSchedules);
