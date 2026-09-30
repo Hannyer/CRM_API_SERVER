@@ -1,10 +1,12 @@
 const { Router } = require('express');
 const ctrl = require('../controllers/users.controller');
 const { verifyToken, requirePermission } = require('../middlewares/auth.middleware');
+const { requireCrmEntitlement } = require('../middlewares/subscription.middleware');
 
 const router = Router();
 
 router.use(verifyToken);
+router.use(requireCrmEntitlement('users'));
 
 router.get('/license-types', requirePermission('users'), ctrl.listLicenseTypes);
 router.get('/', requirePermission('users'), ctrl.list);

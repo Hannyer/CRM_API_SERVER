@@ -1,11 +1,13 @@
 const { Router } = require('express');
 const ctrl = require('../controllers/reports.controller');
 const { verifyToken, requirePermission } = require('../middlewares/auth.middleware');
+const { requireCrmEntitlement } = require('../middlewares/subscription.middleware');
 
 const router = Router();
 
 router.use(verifyToken);
-router.use(requirePermission('bookings'));
+router.use(requireCrmEntitlement('reports'));
+router.use(requirePermission('reports'));
 
 router.get('/sales', ctrl.salesByPeriod);
 router.get('/commissions', ctrl.commissionsByCompany);

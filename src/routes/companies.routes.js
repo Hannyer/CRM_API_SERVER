@@ -1,11 +1,13 @@
 const { Router } = require('express');
 const ctrl = require('../controllers/companies.controller');
 const { verifyToken } = require('../middlewares/auth.middleware');
+const { requireCrmEntitlement } = require('../middlewares/subscription.middleware');
 
 const router = Router();
 
 // Todas las rutas de este modulo requieren sesion iniciada.
 router.use(verifyToken);
+router.use(requireCrmEntitlement('companies'));
 
 // Rutas para compañías
 router.get('/', ctrl.list);

@@ -1,10 +1,12 @@
 const { Router } = require('express');
 const ctrl = require('../controllers/transport.controller');
 const { verifyToken, requirePermission } = require('../middlewares/auth.middleware');
+const { requireCrmEntitlement } = require('../middlewares/subscription.middleware');
 
 const router = Router();
 
 router.use(verifyToken);
+router.use(requireCrmEntitlement('transports'));
 
 router.get('/available', requirePermission('transports'), ctrl.listAvailable);
 router.get('/', requirePermission('transports'), ctrl.list);

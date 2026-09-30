@@ -1,11 +1,13 @@
 const { Router } = require('express');
 const ctrl = require('../controllers/reference-points.controller');
 const { verifyToken, requirePermission } = require('../middlewares/auth.middleware');
+const { requireCrmEntitlement } = require('../middlewares/subscription.middleware');
 
 const router = Router();
 const MENU_CODE = 'reference-points';
 
 router.use(verifyToken);
+router.use(requireCrmEntitlement(MENU_CODE));
 
 router.get('/select', ctrl.select);
 router.get('/', requirePermission(MENU_CODE), ctrl.list);
