@@ -229,14 +229,17 @@ async function createBooking(payload) {
   }
 
   const detailedBooking = await bookingsRepo.getBookingById(booking.id);
-  let invoiceEmailSent = false;
-  try {
-    invoiceEmailSent = await sendBookingInvoiceEmail(detailedBooking || booking);
-  } catch (e) {
-    console.error('No se pudo enviar la factura de la reserva:', e.message);
-  }
 
-  return { ...booking, invoiceEmailSent };
+  // El correo se manda en segundo plano, a proposito.
+  // Antes se esperaba el envio: si el SMTP estaba bloqueado o lento (en Render
+  // los puertos de correo salientes lo estan), la peticion se quedaba colgada y
+  // el usuario veia un error de tiempo de espera aunque la reserva YA estaba
+  // creada, con el riesgo de que la volviera a crear duplicada.
+  Promise.resolve()
+    .then(() => sendBookingInvoiceEmail(detailedBooking || booking))
+    .catch((e) => console.error('No se pudo enviar la factura de la reserva:', e.message));
+
+  return { ...booking, invoiceEmailQueued: true };
 }
 
 /**

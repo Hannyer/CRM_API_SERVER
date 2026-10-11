@@ -35,6 +35,11 @@ function getTransporter() {
       requireTLS: true,
       family: 4,
       auth: { user, pass },
+      // Sin estos topes, si el puerto SMTP esta bloqueado la conexion se queda
+      // colgada varios minutos en vez de fallar. Mejor fallar rapido y registrar.
+      connectionTimeout: 8000,
+      greetingTimeout: 8000,
+      socketTimeout: 12000,
     });
     transporterKey = key;
   }
