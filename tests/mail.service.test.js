@@ -7,8 +7,10 @@ const source = fs.readFileSync(require.resolve('../src/services/mail.service'), 
 function load(env, responses = []) {
   const calls = [];
   const transports = [];
+  const logs = [];
   const context = {
     module: { exports: {} }, process: { env }, URLSearchParams, AbortSignal,
+    console: { info: (_prefix, value) => logs.push(JSON.parse(value)), error: (_prefix, value) => logs.push(JSON.parse(value)) },
     fetch: async (url, options) => {
       calls.push({ url, options });
       const response = responses.shift();
@@ -23,7 +25,7 @@ function load(env, responses = []) {
     } }),
   };
   vm.runInNewContext(source, context);
-  return { mail: context.module.exports, calls, transports };
+  return { mail: context.module.exports, calls, transports, logs };
 }
 const env = { MAIL_PROVIDER: 'gmail-api', GMAIL_USER: 'sender@gmail.com',
   GMAIL_CLIENT_ID: 'client', GMAIL_CLIENT_SECRET: 'secret', GMAIL_REFRESH_TOKEN: 'refresh' };
@@ -73,4 +75,29 @@ test('SMTP local sigue funcionando por defecto', async () => {
 test('fallo de red devuelve un error controlado', async () => {
   const { mail } = load(env, [new Error('network secret')]);
   await assert.rejects(mail.sendMail(message), { code: 'GMAIL_OAUTH_ERROR' });
+});
+
+test('logs identifican token revocado sin incluir secretos ni destinatarios', async () => {
+  const { mail, logs } = load(env, [{ status: 400, data: { error: 'invalid_grant', error_description: 'secret' } }]);
+  await assert.rejects(mail.sendMail(message));
+  assert.equal(logs[0].event, 'failed');
+  assert.equal(logs[0].stage, 'oauth');
+  assert.equal(logs[0].httpStatus, 400);
+  assert.equal(logs[0].reason, 'invalid_grant');
+  assert.match(logs[0].hint, /Reautorice/);
+  assert.doesNotMatch(JSON.stringify(logs), /secret|recipient@example.com|sender@gmail.com/);
+});
+test('logs indican variables faltantes por nombre sin mostrar valores', async () => {
+  const { mail, logs } = load({ ...env, GMAIL_REFRESH_TOKEN: '' });
+  await assert.rejects(mail.sendMail(message));
+  assert.deepEqual(logs[0].missingVariables, ['GMAIL_REFRESH_TOKEN']);
+});
+test('log accepted identifica mensaje sin afirmar entrega', async () => {
+  const { mail, logs } = load(env, [
+    { status: 200, data: { access_token: 'access' } },
+    { status: 200, data: { id: 'gmail-id' } },
+  ]);
+  await mail.sendMail(message);
+  assert.equal(logs[0].event, 'accepted');
+  assert.equal(logs[0].messageId, 'gmail-id');
 });

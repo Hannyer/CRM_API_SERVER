@@ -55,13 +55,47 @@ function getTransporter() {
 
 async function sendMail({ to, subject, text, html }) {
   const { from, provider } = getMailConfig();
-  if (!isMailConfigured()) {
-    const error = new Error('Servicio de correo no configurado. Revise MAIL_PROVIDER y las credenciales del proveedor.');
-    error.code = 'MAIL_NOT_CONFIGURED';
+  const started = Date.now();
+  try {
+    if (!isMailConfigured()) {
+      const error = new Error('Servicio de correo no configurado. Revise MAIL_PROVIDER y las credenciales del proveedor.');
+      error.code = 'MAIL_NOT_CONFIGURED';
+      throw error;
+    }
+    const result = provider === 'gmail-api'
+      ? await sendViaGmailApi({ from, to, subject, text, html })
+      : await getTransporter().sendMail({ from, to, subject, text, html });
+    console.info('[mail]', JSON.stringify({ event: 'accepted', provider, durationMs: Date.now() - started, messageId: result.messageId }));
+    return result;
+  } catch (error) {
+    console.error('[mail]', JSON.stringify({
+      event: 'failed', provider, durationMs: Date.now() - started,
+      code: error.code || 'MAIL_UNKNOWN_ERROR', stage: error.stage || (provider === 'smtp' ? 'smtp' : 'configuration_or_mime'),
+      httpStatus: error.httpStatus, reason: error.mailReason,
+      hint: getMailHint(error), missingVariables: getMissingMailVariables(),
+    }));
     throw error;
   }
-  if (provider === 'gmail-api') return sendViaGmailApi({ from, to, subject, text, html });
-  return getTransporter().sendMail({ from, to, subject, text, html });
+}
+
+function getMissingMailVariables() {
+  const config = getMailConfig();
+  const required = config.provider === 'gmail-api'
+    ? { 'GMAIL_USER o MAIL_USER': config.user, GMAIL_CLIENT_ID: config.clientId, GMAIL_CLIENT_SECRET: config.clientSecret, GMAIL_REFRESH_TOKEN: config.refreshToken }
+    : { 'GMAIL_USER o MAIL_USER': config.user, 'GMAIL_APP_PASSWORD o MAIL_PASS': config.pass };
+  return Object.keys(required).filter((key) => !required[key]);
+}
+
+function getMailHint(error) {
+  if (error.mailReason === 'invalid_grant') return 'Refresh token vencido o revocado, o no corresponde al cliente OAuth. Reautorice Gmail; en modo Testing caduca a los 7 dias.';
+  if (['invalid_client', 'unauthorized_client'].includes(error.mailReason)) return 'Revise GMAIL_CLIENT_ID y GMAIL_CLIENT_SECRET y el cliente que genero el refresh token.';
+  if (error.code === 'MAIL_NOT_CONFIGURED') return 'Revise MAIL_PROVIDER (smtp o gmail-api) y missingVariables.';
+  if (error.httpStatus === 403) return 'Revise Gmail API habilitada, permiso gmail.send, restricciones y cuota en Google Cloud.';
+  if (error.httpStatus === 429) return 'Google limito los envios. Revise cuotas; no reintente en bucle.';
+  if (error.httpStatus === 401) return 'Google rechazo la autorizacion; vuelva a autorizar con gmail.send.';
+  if (error.code === 'EAUTH') return 'SMTP rechazo las credenciales. Revise usuario y contrasena de aplicacion.';
+  if (error.stage === 'network' || error.code === 'ETIMEDOUT' || error.code === 'ECONNECTION') return 'Fallo de red o timeout; SMTP 587 esta bloqueado en Render gratuito. Use MAIL_PROVIDER=gmail-api.';
+  return 'Revise code, stage, httpStatus y reason; confirme las variables del proveedor en Render.';
 }
 
 async function googleRequest(url, options, code) {
@@ -71,14 +105,28 @@ async function googleRequest(url, options, code) {
   } catch {
     const error = new Error('No se pudo conectar con Google por HTTPS o se agoto el tiempo de espera.');
     error.code = code;
+    error.stage = 'network';
     throw error;
   }
-  const data = await response.json();
+  let data;
+  try {
+    data = await response.json();
+  } catch {
+    const error = new Error('Google devolvio una respuesta no JSON.');
+    error.code = code;
+    error.stage = 'response';
+    error.httpStatus = response.status;
+    throw error;
+  }
   if (!response.ok) {
     // No registrar respuestas completas: pueden contener datos del mensaje o credenciales.
-    const reason = typeof data.error === 'string' ? data.error : data.error?.status;
+    const candidate = typeof data.error === 'string' ? data.error : data.error?.status;
+    const reason = /^[a-zA-Z0-9_]{1,80}$/.test(candidate || '') ? candidate : 'unknown';
     const error = new Error(`Google rechazo la solicitud de correo (HTTP ${response.status}, ${reason || 'unknown'}).`);
     error.code = code;
+    error.stage = code === 'GMAIL_OAUTH_ERROR' ? 'oauth' : 'gmail_send';
+    error.httpStatus = response.status;
+    error.mailReason = reason;
     throw error;
   }
   return data;
@@ -125,4 +173,5 @@ module.exports = {
   sendMail,
   isMailConfigured,
   escapeHtml,
+  getMissingMailVariables,
 };

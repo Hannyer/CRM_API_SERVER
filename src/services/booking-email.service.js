@@ -1,4 +1,4 @@
-const { sendMail, isMailConfigured, escapeHtml } = require('./mail.service');
+const { sendMail, isMailConfigured, escapeHtml, getMissingMailVariables } = require('./mail.service');
 
 function asNumber(value) {
   if (value === null || value === undefined || value === '') return null;
@@ -116,9 +116,12 @@ function buildBookingInvoiceEmail(booking) {
 }
 
 async function sendBookingInvoiceEmail(booking) {
-  if (!booking?.customerEmail) return false;
+  if (!booking?.customerEmail) {
+    console.warn('[mail]', JSON.stringify({ event: 'skipped', context: 'booking_invoice', reason: 'missing_customer_email', bookingId: booking?.id }));
+    return false;
+  }
   if (!isMailConfigured()) {
-    console.warn('Factura no enviada: servicio de correo no configurado.');
+    console.warn('[mail]', JSON.stringify({ event: 'skipped', context: 'booking_invoice', reason: 'mail_not_configured', provider: process.env.MAIL_PROVIDER || 'smtp', missingVariables: getMissingMailVariables(), bookingId: booking.id }));
     return false;
   }
 
