@@ -5,11 +5,19 @@ const { AppError } = require('../utils/AppError');
 function normalizeRange({ from, to } = {}) {
   if (!from || !to) throw new AppError('Debes indicar el rango de fechas (from y to)', 400);
   const f = new Date(from);
-  const t = new Date(to);
+  let t = new Date(to);
   if (Number.isNaN(f.getTime()) || Number.isNaN(t.getTime())) {
     throw new AppError('Fechas inválidas', 400);
   }
-  if (f >= t) throw new AppError('La fecha inicial debe ser menor que la final', 400);
+
+  // "Hasta" se entiende como un dia incluido. Si llega solo la fecha, sin hora,
+  // se corre al final de ese dia; asi consultar un mismo dia (desde = hasta)
+  // devuelve lo de ese dia en vez de un rango vacio.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(to).trim())) {
+    t = new Date(t.getTime() + 24 * 60 * 60 * 1000);
+  }
+
+  if (f >= t) throw new AppError('La fecha inicial no puede ser posterior a la final', 400);
   return { from: f.toISOString(), to: t.toISOString() };
 }
 

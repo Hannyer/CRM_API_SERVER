@@ -266,6 +266,46 @@ async function setScheduleGuides(activityScheduleId, guideIds = []) {
   try {
     await client.query('BEGIN');
 
+    if (guideIds.length > 0) {
+      // Se bloquean los guias involucrados antes de revisar el traslape.
+      // Sin esto, dos asignaciones simultaneas del mismo guia leian ambas
+      // "libre" y terminaba asignado a dos salidas a la misma hora.
+      // El ORDER BY evita bloqueos cruzados entre peticiones.
+      await client.query(
+        `SELECT id FROM ops.app_user WHERE id = ANY($1::uuid[]) ORDER BY id FOR UPDATE`,
+        [guideIds]
+      );
+
+      const choque = await client.query(
+        `
+        SELECT u.full_name AS guia, a.title AS actividad, s.scheduled_start AS inicio
+          FROM ops.activity_schedule_guide asg
+          JOIN ops.activity_schedule s ON s.id = asg.activity_schedule_id
+          JOIN ops.activity a ON a.id = s.activity_id
+          JOIN ops.app_user u ON u.id = asg.guide_id
+          CROSS JOIN (
+            SELECT scheduled_start, scheduled_end
+              FROM ops.activity_schedule WHERE id = $1::uuid
+          ) ts
+         WHERE asg.guide_id = ANY($2::uuid[])
+           AND s.id <> $1::uuid
+           AND s.status = true
+           AND s.scheduled_start < ts.scheduled_end
+           AND s.scheduled_end > ts.scheduled_start
+         LIMIT 1
+        `,
+        [activityScheduleId, guideIds]
+      );
+      if (choque.rowCount > 0) {
+        const c = choque.rows[0];
+        const err = new Error(
+          `El guía ${c.guia} ya está asignado a "${c.actividad}" en ese mismo horario`
+        );
+        err.code = 'GUIDE_OVERLAP';
+        throw err;
+      }
+    }
+
     await client.query(
       `DELETE FROM ops.activity_schedule_guide WHERE activity_schedule_id = $1::uuid`,
       [activityScheduleId]

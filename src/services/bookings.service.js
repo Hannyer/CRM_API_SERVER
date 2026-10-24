@@ -421,7 +421,22 @@ async function updateBooking(bookingId, payload) {
     }
   }
 
-  return bookingsRepo.updateBooking(bookingId, updatePayload);
+  // El repositorio revalida el cupo dentro de una transaccion con bloqueo:
+  // la comprobacion de arriba es solo una primera barrera.
+  try {
+    return await bookingsRepo.updateBooking(bookingId, updatePayload);
+  } catch (e) {
+    if (e && e.code === 'NO_CAPACITY') {
+      throw new AppError(
+        `No hay suficientes espacios disponibles. Espacios disponibles: ${e.available}, solicitados: ${e.requested}`,
+        400
+      );
+    }
+    if (e && e.code === 'SCHEDULE_NOT_FOUND') {
+      throw new AppError('La planeación especificada no existe o no está disponible', 404);
+    }
+    throw e;
+  }
 }
 
 /**

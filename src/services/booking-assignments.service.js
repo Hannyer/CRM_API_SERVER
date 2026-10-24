@@ -90,7 +90,16 @@ async function assignScheduleGuides(activityScheduleId, guideIds = []) {
     assertGuidesSelectableForSchedule(guides, uniqueIds);
   }
 
-  await assignmentsRepo.setScheduleGuides(activityScheduleId, uniqueIds);
+  // El repositorio vuelve a revisar el traslape dentro de una transaccion con
+  // bloqueo: la comprobacion de arriba no basta si dos operadores asignan a la vez.
+  try {
+    await assignmentsRepo.setScheduleGuides(activityScheduleId, uniqueIds);
+  } catch (e) {
+    if (e && e.code === 'GUIDE_OVERLAP') {
+      throw new AppError(e.message, 400);
+    }
+    throw e;
+  }
   return assignmentsRepo.listScheduleGuideAssignments();
 }
 

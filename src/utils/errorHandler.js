@@ -29,9 +29,30 @@ function getErrorTitle(status) {
  * @param {string} defaultMessage - Mensaje por defecto si no se proporciona
  * @returns {object} - Objeto con estructura { status, title, message }
  */
+/**
+ * Errores que vienen de PostgreSQL y que en realidad son culpa del dato
+ * enviado, no del servidor. Sin esto respondian 500 y parecian caidas:
+ * por ejemplo un identificador que no es UUID, o un texto mas largo que
+ * la columna.
+ */
+const ERRORES_POSTGRES = {
+  '22P02': [400, 'Alguno de los datos enviados tiene un formato inválido.'],
+  '22003': [400, 'Un valor numérico está fuera del rango permitido.'],
+  '22001': [400, 'Uno de los textos enviados supera el largo permitido.'],
+  '23502': [400, 'Falta un dato obligatorio.'],
+  '23503': [400, 'El registro referenciado no existe.'],
+  '23505': [409, 'Ya existe un registro con esos datos.'],
+  '23514': [400, 'Los datos no cumplen una regla de validación.'],
+};
+
 function formatError(error, defaultStatus = 500, defaultMessage = 'Ha ocurrido un error') {
   let status = defaultStatus;
   let message = defaultMessage;
+
+  const pg = error && typeof error === 'object' && ERRORES_POSTGRES[error.code];
+  if (pg && !(error instanceof AppError)) {
+    return { status: pg[0], title: getErrorTitle(pg[0]), message: pg[1] };
+  }
 
   if (error instanceof AppError) {
     status = error.status || defaultStatus;

@@ -52,7 +52,9 @@ async function checkAvailability(scheduleId) {
       s.id as "scheduleId",
       a.id as "activityId",
       a.title as "activityTitle",
-      a.party_size as "partySize",
+      -- Manda la capacidad propia de la salida si la tiene; si viene en cero
+      -- (como en las salidas historicas) se usa el cupo de la actividad.
+      COALESCE(NULLIF(s.capacity, 0), a.party_size) as "partySize",
       COALESCE(
         (
           SELECT SUM(b.number_of_people)
@@ -62,7 +64,7 @@ async function checkAvailability(scheduleId) {
         ),
         0
       ) as "bookedPeople",
-      (a.party_size - COALESCE(
+      (COALESCE(NULLIF(s.capacity, 0), a.party_size) - COALESCE(
         (
           SELECT SUM(b.number_of_people)
           FROM ops.booking b
@@ -247,7 +249,7 @@ async function createBooking({
 
     // 2) Recalcula la disponibilidad DENTRO de la transaccion (ya ve lo que confirmo la otra).
     const av = await client.query(
-      `SELECT a.party_size::int AS party_size,
+      `SELECT COALESCE(NULLIF(s.capacity, 0), a.party_size)::int AS party_size,
               COALESCE((
                 SELECT SUM(b.number_of_people)
                 FROM ops.booking b
@@ -635,12 +637,73 @@ async function updateBooking(bookingId, {
       created_by as "createdBy";
   `;
 
-  const { rows } = await pool.query(sql, params);
-  if (rows.length === 0) {
-    return null;
-  }
+  // El cupo se revalida DENTRO de una transaccion que bloquea el horario.
+  // Sin esto, dos ediciones simultaneas leian la misma disponibilidad y las
+  // dos pasaban: se llegaba a 18 personas en una actividad de 10.
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
 
-  return rows[0];
+    const actual = await client.query(
+      `SELECT activity_schedule_id, number_of_people, status
+         FROM ops.booking WHERE id = $1::uuid FOR UPDATE`,
+      [bookingId]
+    );
+    if (actual.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return null;
+    }
+
+    const previo = actual.rows[0];
+    const destino = activityScheduleId || previo.activity_schedule_id;
+    const personas = numberOfPeople !== undefined ? Number(numberOfPeople) : Number(previo.number_of_people);
+    const estado = status !== undefined ? status : previo.status;
+    const ocupaCupo = estado === 'pending' || estado === 'confirmed';
+    const cambiaCupo = activityScheduleId !== undefined || numberOfPeople !== undefined;
+
+    if (ocupaCupo && cambiaCupo) {
+      const locked = await client.query(
+        `SELECT s.id FROM ops.activity_schedule s
+          WHERE s.id = $1::uuid AND s.status = true FOR UPDATE`,
+        [destino]
+      );
+      if (locked.rowCount === 0) {
+        const err = new Error('Planeacion no encontrada o inactiva');
+        err.code = 'SCHEDULE_NOT_FOUND';
+        throw err;
+      }
+
+      // Se excluye la propia reserva: sus lugares actuales no cuentan como ocupados.
+      const av = await client.query(
+        `SELECT COALESCE(NULLIF(s.capacity, 0), a.party_size)::int AS party_size,
+                COALESCE((SELECT SUM(b.number_of_people) FROM ops.booking b
+                   WHERE b.activity_schedule_id = s.id
+                     AND b.status IN ('pending','confirmed')
+                     AND b.id <> $2::uuid), 0)::int AS booked
+           FROM ops.activity_schedule s
+           JOIN ops.activity a ON a.id = s.activity_id
+          WHERE s.id = $1::uuid`,
+        [destino, bookingId]
+      );
+      const disponible = (av.rows[0].party_size || 0) - (av.rows[0].booked || 0);
+      if (disponible < personas) {
+        const err = new Error('Sin cupos disponibles');
+        err.code = 'NO_CAPACITY';
+        err.available = disponible;
+        err.requested = personas;
+        throw err;
+      }
+    }
+
+    const { rows } = await client.query(sql, params);
+    await client.query('COMMIT');
+    return rows.length === 0 ? null : rows[0];
+  } catch (e) {
+    await client.query('ROLLBACK');
+    throw e;
+  } finally {
+    client.release();
+  }
 }
 
 /**
