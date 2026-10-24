@@ -212,7 +212,7 @@ async function create(req, res) {
         details: e.details
       });
     }
-    res.status(500).json({ message: 'Error al crear compañía: ' + e.message });
+    sendErrorResponse(res, e, 500, 'Error al crear compañía');
   }
 }
 

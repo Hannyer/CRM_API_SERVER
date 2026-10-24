@@ -461,7 +461,9 @@ async function create(req, res) {
         details: e.details
       });
     }
-    res.status(500).json({ message: 'Error al crear reserva: ' + e.message });
+    // Pasa por el manejador central: ahi se traducen los errores de datos
+    // (id que no es UUID, decimal donde va entero, texto muy largo) a 400.
+    sendErrorResponse(res, e, 500, 'Error al crear reserva');
   }
 }
 
