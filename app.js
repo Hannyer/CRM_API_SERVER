@@ -15,6 +15,18 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', uptime: process.uptime() });
 });
 
+// Database healthcheck: uses the same PostgreSQL pool as the API.
+app.get('/health/db', async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  try {
+    const { pool } = require('./src/config/db.pg');
+    await pool.query('SELECT 1');
+    res.json({ status: 'ok', database: 'ok' });
+  } catch (error) {
+    console.error('Database healthcheck failed:', error.code || 'unknown');
+    res.status(503).json({ status: 'error', database: 'unavailable' });
+  }
+});
 // API routes
 app.use('/api', routes);
 // swagger
