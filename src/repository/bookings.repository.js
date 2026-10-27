@@ -659,7 +659,8 @@ async function updateBooking(bookingId, {
     const personas = numberOfPeople !== undefined ? Number(numberOfPeople) : Number(previo.number_of_people);
     const estado = status !== undefined ? status : previo.status;
     const ocupaCupo = estado === 'pending' || estado === 'confirmed';
-    const cambiaCupo = activityScheduleId !== undefined || numberOfPeople !== undefined;
+    const antesOcupabaCupo = previo.status === 'pending' || previo.status === 'confirmed';
+    const cambiaCupo = activityScheduleId !== undefined || numberOfPeople !== undefined || !antesOcupabaCupo;
 
     if (ocupaCupo && cambiaCupo) {
       const locked = await client.query(

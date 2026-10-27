@@ -1,7 +1,7 @@
 // src/routes/activity-types.routes.js
 const { Router } = require('express');
 const ctrl = require('../controllers/activity-types.controller');
-const { verifyToken } = require('../middlewares/auth.middleware');
+const { verifyToken, requirePermission } = require('../middlewares/auth.middleware');
 const { requireCrmEntitlement } = require('../middlewares/subscription.middleware');
 
 const router = Router();
@@ -12,9 +12,9 @@ router.use(requireCrmEntitlement('activity-types'));
 
 router.get('/', ctrl.list);
 router.get('/:id', ctrl.getById);
-router.post('/', ctrl.create);
-router.put('/:id', ctrl.update);
-router.delete('/:id', ctrl.remove);
+router.post('/', requirePermission('activities'), ctrl.create);
+router.put('/:id', requirePermission('activities'), ctrl.update);
+router.delete('/:id', requirePermission('activities'), ctrl.remove);
 
 module.exports = router;
 

@@ -2,7 +2,9 @@
 const userService = require('../services/users.service');
 const configService = require('../services/config.service');
 const passwordResetService = require('../services/password-reset.service');
-const { decrypt } = require('../utils/crypto-compat');
+const { hashPassword, verifyPassword, isModernHash } = require('../utils/password');
+const usersRepo = require('../repository/user.repository');
+const { sessionVersion } = require('../utils/session-version');
 const { AppError } = require('../utils/AppError');
 
 /**
@@ -43,14 +45,14 @@ async function login(req, res) {
 
     if (!user) return unauthorized();
 
-    let storedPlain;
-    try {
-      storedPlain = decrypt(user.password_hash);
-    } catch {
-      return unauthorized();
+    if (!user.status || !(await verifyPassword(password, user.password_hash))) return unauthorized();
+    if (!isModernHash(user.password_hash)) {
+      const nextHash = await hashPassword(password, { legacyMigration: true });
+      if (!(await usersRepo.upgradePasswordHash(user.id, user.password_hash, nextHash))) return unauthorized();
+      user.password_hash = nextHash;
     }
-    if (storedPlain !== password) return unauthorized();
-    if (!user.status) return unauthorized();
+    const current = await usersRepo.getAuthUserById(user.id);
+    if (!current?.status || current.role_id !== user.role_id || current.password_hash !== user.password_hash) return unauthorized();
 
     const rolClienteValue = await configService.getRolClienteValue();
     const isExternal =
@@ -59,9 +61,9 @@ async function login(req, res) {
     const { JWT_SECRET: jwtSecret } = require('../config/jwt');
     const jwt = require('jsonwebtoken');
     const token = jwt.sign(
-      { id: user.id, roleId: user.role_id },
+      { id: user.id, roleId: user.role_id, sv: sessionVersion(user, jwtSecret) },
       jwtSecret,
-      { expiresIn: '8h' }
+      { expiresIn: '8h', algorithm: 'HS256' }
     );
 
     const {

@@ -77,11 +77,8 @@ function formatError(error, defaultStatus = 500, defaultMessage = 'Ha ocurrido u
     message = error;
   }
 
-  return {
-    status,
-    title: getErrorTitle(status),
-    message,
-  };
+  if (status >= 500 && !(error instanceof AppError)) message = defaultMessage;
+  return { status, title: getErrorTitle(status), message };
 }
 
 /**

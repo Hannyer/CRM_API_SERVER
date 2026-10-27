@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const usersRepo = require('../repository/user.repository');
-const { encrypt } = require('../utils/crypto-compat');
+const { hashPassword } = require('../utils/password');
 const { AppError } = require('../utils/AppError');
 const { sendMail, isMailConfigured, escapeHtml } = require('./mail.service');
 
@@ -176,7 +176,8 @@ async function resetPassword({ token, newPassword }) {
     throw new AppError('La nueva contrasena debe tener al menos 6 caracteres', 400, 'INVALID_PASSWORD');
   }
 
-  const user = await usersRepo.getUserByPasswordResetToken(hashToken(token.trim()));
+  const passwordHash = await hashPassword(newPassword);
+  const user = await usersRepo.consumePasswordResetToken(hashToken(token.trim()), passwordHash);
   if (!user) {
     throw new AppError(
       'El enlace de recuperacion no es valido o ya expiro',
@@ -185,7 +186,6 @@ async function resetPassword({ token, newPassword }) {
     );
   }
 
-  await usersRepo.updatePasswordById(user.id, encrypt(newPassword));
   return { message: 'Contrasena actualizada correctamente.' };
 }
 

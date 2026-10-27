@@ -421,10 +421,37 @@ async function setBookingGuides(bookingId, guideIds = []) {
 /**
  * Asigna un transporte a una reserva. Si transportId es null, elimina la asignación.
  */
-async function setBookingTransport(bookingId, transportId, driverId = null, referencePointId = null, pickupAt = null) {
+async function setBookingTransport(bookingId, transportId, driverId = null, referencePointId = null, pickupAt = null, driverRoleId = null) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+
+    // Revalidate protected resources inside the transaction, before replacing assignments.
+    const bookingResult = await client.query(
+      `SELECT transport, status, COALESCE(passenger_count, number_of_people) AS passengers
+         FROM ops.booking WHERE id = $1::uuid FOR UPDATE`, [bookingId]
+    );
+    const currentBooking = bookingResult.rows[0];
+    if (!currentBooking || currentBooking.status === 'cancelled' || !currentBooking.transport) {
+      const { AppError } = require('../utils/AppError');
+      throw new AppError('Reserva no disponible para asignar transporte', 400);
+    }
+    if (transportId) {
+      const vehicleResult = await client.query(
+        `SELECT capacity FROM ops.transport WHERE id = $1::uuid AND status = true
+           AND operational_status = true FOR UPDATE`, [transportId]
+      );
+      const vehicle = vehicleResult.rows[0];
+      const { AppError } = require('../utils/AppError');
+      if (!vehicle || Number(currentBooking.passengers) > Number(vehicle.capacity)) {
+        throw new AppError('El transporte no tiene capacidad suficiente o no esta activo', 400, 'TRANSPORT_CAPACITY');
+      }
+      const driverResult = await client.query(
+        `SELECT id FROM ops.app_user WHERE id = $1::uuid AND status = true
+          AND role_id = $2::uuid FOR UPDATE`, [driverId, driverRoleId]
+      );
+      if (!driverRoleId || !driverResult.rows.length) throw new AppError('Conductor no disponible', 400, 'INVALID_DRIVER');
+    }
 
     // Eliminar asignación anterior
     await client.query(

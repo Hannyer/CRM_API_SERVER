@@ -207,6 +207,28 @@ async function setPasswordResetToken(userId, tokenHash, expiresAt) {
   );
 }
 
+async function getAuthUserById(userId) {
+  const { rows } = await pool.query(
+    `SELECT u.id, u.role_id, u.password_hash, u.status FROM ops.app_user u
+       JOIN ops.role r ON r.id = u.role_id WHERE u.id = $1::uuid AND r.status = true`, [userId]);
+  return rows[0] || null;
+}
+async function upgradePasswordHash(userId, previousHash, nextHash) {
+  const { rows } = await pool.query(
+    `UPDATE ops.app_user SET password_hash = $3, updated_at = CURRENT_TIMESTAMP
+      WHERE id = $1::uuid AND password_hash = $2 AND status = true RETURNING id`,
+    [userId, previousHash, nextHash]);
+  return rows[0] || null;
+}
+async function consumePasswordResetToken(tokenHash, passwordHash) {
+  const { rows } = await pool.query(
+    `UPDATE ops.app_user SET password_hash = $2, password_reset_token_hash = NULL,
+       password_reset_expires_at = NULL, updated_at = CURRENT_TIMESTAMP
+      WHERE password_reset_token_hash = $1 AND password_reset_expires_at > CURRENT_TIMESTAMP
+        AND status = true RETURNING id`, [tokenHash, passwordHash]);
+  return rows[0] || null;
+}
+
 async function getUserByPasswordResetToken(tokenHash) {
   const { rows } = await pool.query(
     `
@@ -349,6 +371,9 @@ module.exports = {
   createUser,
   getUserById,
   getUserByEmail,
+  getAuthUserById,
+  upgradePasswordHash,
+  consumePasswordResetToken,
   setPasswordResetToken,
   getUserByPasswordResetToken,
   updatePasswordById,

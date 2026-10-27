@@ -3,12 +3,22 @@ const cors = require('cors');
 const swaggerUi = require('swagger-ui-express'); 
 const { specs } = require('./src/config/swagger');  
 const routes = require('./src/routes');
+const { sendErrorResponse } = require('./src/utils/errorHandler');
 
 const app = express();
 
 // Middlewares
-app.use(cors());
-app.use(express.json());
+const allowedOrigins = (process.env.CORS_ORIGINS || process.env.FRONTEND_URL || 'https://core-link-three.vercel.app,http://localhost:5173')
+  .split(',').map(value => value.trim()).filter(Boolean);
+app.use(cors({
+  origin(origin, callback) { callback(null, !origin || allowedOrigins.includes(origin)); },
+  credentials: true,
+  methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+}));
+const proxyHops = Number(process.env.TRUST_PROXY_HOPS || (process.env.RENDER ? 1 : 0));
+if (!Number.isInteger(proxyHops) || proxyHops < 0 || proxyHops > 5) throw new Error('Invalid TRUST_PROXY_HOPS');
+app.set('trust proxy', proxyHops);
+app.use(express.json({ limit: '100kb' }));
 
 // Healthcheck
 app.get('/health', (req, res) => {
@@ -32,14 +42,7 @@ app.use('/api', routes);
 // swagger
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(specs));
 
-app.use(cors({
-  origin: [
-    "https://core-link-three.vercel.app",
-    "http://localhost:5173"
-  ],
-  credentials: true,
-  methods: "GET,POST,PUT,DELETE,OPTIONS"
-}));
+
 
 app.get('/', (req, res) => {
   res.send('CRM API OK ✅');
@@ -49,9 +52,7 @@ app.get('/', (req, res) => {
 // Error handler
 app.use((err, req, res, next) => {
   console.error('Error:', err);
-  res.status(err.status || 500).json({
-    message: err.message || 'Internal Server Error'
-  });
+  sendErrorResponse(res, err, err.status || 500, 'Error interno del servidor');
 });
 
 module.exports = app;

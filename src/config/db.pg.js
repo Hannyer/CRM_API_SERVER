@@ -1,37 +1,10 @@
 // src/config/db.pg.js
 const { Pool } = require('pg');
 
-// 🔥 CONFIG SSL ESPECÍFICA PARA SUPABASE POOLER
-const getSSLConfig = () => {
-  const dbUrl = process.env.DATABASE_URL || '';
-
-  // Si es Supabase pooler SIEMPRE SSL sin validar certificado
-  if (dbUrl.includes('supabase.com')) {
-    return {
-      require: true,
-      rejectUnauthorized: false, // evita error self-signed certificate
-    };
-  }
-
-  // Otros proveedores remotos
-  if (
-    dbUrl.includes('render.com') ||
-    dbUrl.includes('herokuapp.com') ||
-    dbUrl.includes('sslmode=require') ||
-    process.env.NODE_ENV === 'production'
-  ) {
-    return {
-      require: true,
-      rejectUnauthorized: false,
-    };
-  }
-
-  return false;
-};
+const { databaseOptions } = require('./database-options');
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: getSSLConfig(),
+  ...databaseOptions(),
 
   max: 20,
   idleTimeoutMillis: 30000,

@@ -5,7 +5,7 @@ const rolesService = require('./roles.service');
 const passwordResetService = require('./password-reset.service');
 const { isMailConfigured } = require('./mail.service');
 const { AppError } = require('../utils/AppError');
-const { encrypt } = require('../utils/crypto-compat');
+const { hashPassword } = require('../utils/password');
 
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -260,7 +260,7 @@ async function createUser(payload) {
     email: normalizedEmail,
     fullName: fullName.trim(),
     phone: phone.trim(),
-    passwordHash: hasPassword ? encrypt(password) : null,
+    passwordHash: hasPassword ? await hashPassword(password) : null,
     roleId: roleId.trim(),
     speaksEnglish: !!speaksEnglish,
     status: status !== false,
@@ -328,7 +328,7 @@ async function updateUser(userId, payload) {
   if (fullName !== undefined) updateData.fullName = fullName.trim();
   if (phone !== undefined) updateData.phone = phone.trim();
   if (password !== undefined && password !== '') {
-    updateData.passwordHash = encrypt(password);
+    updateData.passwordHash = await hashPassword(password);
   }
   if (roleId !== undefined) {
     await assertValidRoleId(roleId);

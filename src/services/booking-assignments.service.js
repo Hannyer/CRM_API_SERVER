@@ -4,6 +4,8 @@ const bookingsRepo = require('../repository/bookings.repository');
 const transportRepo = require('../repository/transport.repository');
 const referencePointsRepo = require('../repository/reference-points.repository');
 const { AppError } = require('../utils/AppError');
+const usersRepo = require('../repository/user.repository');
+const configService = require('./config.service');
 
 const MAX_GUIDES_PER_BOOKING = 5;
 
@@ -181,6 +183,16 @@ async function assignTransport(bookingId, transportId, driverId = null, referenc
       throw new AppError('driverId es requerido cuando se asigna transporte', 400);
     }
 
+    const passengers = Number(booking.passengerCount ?? booking.numberOfPeople);
+    if (!Number.isInteger(passengers) || passengers < 0 || passengers > Number(transport.capacity)) {
+      throw new AppError('El transporte no tiene capacidad suficiente para los pasajeros', 400, 'TRANSPORT_CAPACITY');
+    }
+    const driver = await usersRepo.getUserById(driverId);
+    const driverRoleId = await configService.getConductorRoleId();
+    if (!driver?.status || !driverRoleId || String(driver.roleId).toLowerCase() !== String(driverRoleId).toLowerCase()) {
+      throw new AppError('El conductor debe estar activo y tener el rol de conductor', 400, 'INVALID_DRIVER');
+    }
+
     if (referencePointId) {
       const referencePoint = await referencePointsRepo.getReferencePointById(referencePointId);
       if (!referencePoint) {
@@ -203,7 +215,8 @@ async function assignTransport(bookingId, transportId, driverId = null, referenc
     transportId || null,
     driverId || null,
     referencePointId || null,
-    pickupAt || null
+    pickupAt || null,
+    transportId ? await configService.getConductorRoleId() : null
   );
 }
 
